@@ -7,7 +7,7 @@ HAT V2** (driver `epd7in5_V2`), rafraîchi toutes les 10 minutes par un timer sy
 | Zone | Contenu | Source |
 |---|---|---|
 | Bandeau haut | Température extérieure en très grand + écart aux normales de saison, humidité + température d'hier à la même heure, pièces intérieures (température, humidité, CO₂ — 2 max), date, heure de mise à jour, lever/coucher du soleil | Netatmo (mesures + historique `getmeasure`) + normales ERA5 1991-2020 |
-| Zone centrale | Graphique 24 h : courbe de température, barres de pluie, bandeau de couverture nuageuse, maximum de rafales en statistique ; cartouches « pluie vers HH:MM » (pas de 15 min) et conseil d'aération (thermique par temps chaud, CO₂ le soir — calculé depuis les capteurs Netatmo) | Open-Meteo, modèle AROME HD (`meteofrance_arome_france_hd`) |
+| Zone centrale | Graphique 24 h : courbe de température, barres de pluie, bandeau de couverture nuageuse, rafales de l'heure en cours (et pointe à venir si elle est nettement plus forte) ; cartouches « pluie vers HH:MM » (pas de 15 min) et conseil d'aération (thermique par temps chaud, CO₂ le soir — calculé depuis les capteurs Netatmo) | Open-Meteo, modèle AROME HD (`meteofrance_arome_france_hd`) |
 | Bandeau bas | 7 jours : picto WMO, min/max, cumul de pluie | Open-Meteo, modèle ECMWF (`ecmwf_ifs025`) |
 
 Si un modèle Open-Meteo est indisponible, repli automatique sur `best_match`. Si une
@@ -60,7 +60,7 @@ python -m venv .venv
 
 Le layout actif est la variante **D « Épuré »** (`--layout a|b|c|d` pour comparer).
 Elle dérive de la variante A avec moins de traits : pas de légende ni de courbe de
-rafales (le maximum passe en statistique sur la ligne de titre), pas de filets
+rafales (elles passent en statistique sur la ligne de titre), pas de filets
 verticaux, grille deux fois moins dense, et une hiérarchie en trois zones —
 héros / pièces intérieures / métadonnées.
 

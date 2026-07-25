@@ -4,8 +4,8 @@ Trois partis pris par rapport à A :
 - une hiérarchie en trois zones (héros / pièces / métadonnées) au lieu de quatre
   colonnes de poids voisin, et aucun filet vertical — c'est le blanc qui sépare ;
 - la légende disparaît : sans la courbe de rafales il ne reste que la courbe de
-  température et les barres de pluie, qui se lisent d'elles-mêmes (le maximum de
-  rafales passe en statistique sur la ligne de titre) ;
+  température et les barres de pluie, qui se lisent d'elles-mêmes (les rafales
+  passent en statistique sur la ligne de titre) ;
 - grille du graphique deux fois moins dense (repères horaires toujours toutes les 3 h).
 """
 from __future__ import annotations
@@ -79,10 +79,17 @@ def render(snap: Snapshot) -> Image.Image:
     if snap.advice:
         pills.append(snap.advice)
 
-    # statistique de rafales à droite (remplace la courbe pointillée)
+    # rafales à droite : la valeur de l'heure en cours (AROME n'est pas plus fin
+    # que l'heure pour le vent), et la pointe à venir seulement si elle est
+    # nettement plus forte — sinon on annoncerait un coup de vent nocturne
+    # comme s'il soufflait maintenant
     gust_w = 0
     if snap.hourly:
-        gust_s = f"rafales {round(max(h.gust for h in snap.hourly))} km/h"
+        now_gust = round(snap.hourly[0].gust)
+        peak = max(snap.hourly, key=lambda h: h.gust)
+        gust_s = f"rafales {now_gust} km/h"
+        if round(peak.gust) >= max(30, now_gust * 1.4):
+            gust_s += f" · {round(peak.gust)} à {peak.time.hour}h"
         f_gust = font(14)
         gust_w = text_w(d, gust_s, f_gust)
         d.text((WIDTH - MARGIN, 148), gust_s, font=f_gust, fill=BLACK, anchor="ra")
