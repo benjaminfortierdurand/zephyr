@@ -1,0 +1,12 @@
+[Unit]
+Description=Zephyr — rafraîchissement toutes les 10 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+RandomizedDelaySec=30
+Persistent=true
+Unit=zephyr.service
+
+[Install]
+WantedBy=timers.target

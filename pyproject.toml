@@ -1,0 +1,21 @@
+[project]
+name = "zephyr"
+version = "0.1.0"
+description = "Station météo e-ink (Raspberry Pi 4 + Waveshare 7.5\" V2)"
+requires-python = ">=3.11"
+dependencies = [
+    "pillow",
+    "python-dotenv",
+    "requests",
+]
+
+[project.scripts]
+zephyr = "zephyr.main:main"
+zephyr-preview = "zephyr.preview:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
