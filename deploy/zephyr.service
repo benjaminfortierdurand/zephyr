@@ -1,0 +1,11 @@
+[Unit]
+Description=Zephyr — dashboard météo e-ink
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=benfd
+WorkingDirectory=/home/benfd/zephyr
+ExecStart=/home/benfd/zephyr/.venv/bin/python -m zephyr.main
+# stdout/stderr partent dans journald : journalctl -u zephyr.service

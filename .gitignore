@@ -1,0 +1,11 @@
+# Secrets et état local — ne JAMAIS committer
+.env
+data/
+
+# Environnement et artefacts
+.venv/
+__pycache__/
+*.egg-info/
+*.pyc
+*.tmp
+out/
