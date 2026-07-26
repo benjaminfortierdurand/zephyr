@@ -14,12 +14,14 @@ from PIL import Image
 
 from ..models import Snapshot
 from .common import (BLACK, HEIGHT, JOURS_ABR, MOIS_ABR, WHITE, WIDTH,
-                     draw_day_cell, draw_hourly_chart, draw_stale_badge,
-                     draw_wmo_icon, font, fr_num, new_canvas, text_w)
+                     draw_day_cell, draw_hourly_chart, draw_precip_map,
+                     draw_stale_badge, draw_wmo_icon, font, fr_num,
+                     new_canvas, text_w)
 from .layout_a import _fit_room_label
 
 ROOMS_X = 300   # colonne des pièces intérieures
 MARGIN = 22
+MAP_W = 304     # largeur de la carte régionale (cellules carrées sur 164 px de haut)
 
 
 def render(snap: Snapshot) -> Image.Image:
@@ -72,6 +74,14 @@ def render(snap: Snapshot) -> Image.Image:
     f_title = font(16, bold=True)
     d.text((MARGIN, 146), "PROCHAINES 24 H", font=f_title, fill=BLACK)
 
+    # la carte régionale, quand elle est là, prend la droite de la zone et son
+    # propre titre ; le graphique et sa statistique de rafales se resserrent
+    chart_right = WIDTH - MARGIN
+    if snap.precip_grid:
+        chart_right = WIDTH - MARGIN - MAP_W - 20
+        d.text((WIDTH - MARGIN - MAP_W, 146), "PLUIE EN RÉGION",
+               font=f_title, fill=BLACK)
+
     pills = []
     if snap.rain_soon:
         pills.append("pluie en cours" if snap.rain_soon.ongoing
@@ -83,8 +93,10 @@ def render(snap: Snapshot) -> Image.Image:
     # que l'heure pour le vent), et la pointe à venir seulement si elle est
     # nettement plus forte — sinon on annoncerait un coup de vent nocturne
     # comme s'il soufflait maintenant
+    # pendant une averse, l'heure de la pluie prime sur les rafales : on laisse
+    # la place au cartouche plutôt qu'à la statistique de vent
     gust_w = 0
-    if snap.hourly and snap.hourly[0].gust is not None:
+    if snap.precip_grid is None and snap.hourly and snap.hourly[0].gust is not None:
         now_gust = round(snap.hourly[0].gust)
         peak = max((h for h in snap.hourly if h.gust is not None),
                    key=lambda h: h.gust)
@@ -93,10 +105,10 @@ def render(snap: Snapshot) -> Image.Image:
             gust_s += f" · {round(peak.gust)} à {peak.time.hour}h"
         f_gust = font(14)
         gust_w = text_w(d, gust_s, f_gust)
-        d.text((WIDTH - MARGIN, 148), gust_s, font=f_gust, fill=BLACK, anchor="ra")
+        d.text((chart_right, 148), gust_s, font=f_gust, fill=BLACK, anchor="ra")
 
     px = MARGIN + text_w(d, "PROCHAINES 24 H", f_title) + 20
-    limit = WIDTH - MARGIN - gust_w - 24
+    limit = chart_right - gust_w - 24
     f_pill = font(14, bold=True)
     for pill_s in pills:
         pw = text_w(d, pill_s, f_pill) + 24
@@ -106,7 +118,10 @@ def render(snap: Snapshot) -> Image.Image:
         d.text((px + pw // 2, 153), pill_s, font=f_pill, fill=WHITE, anchor="mm")
         px += pw + 10
 
-    draw_hourly_chart(d, (MARGIN, 176, WIDTH - MARGIN, 340), snap.hourly,
+    if snap.precip_grid:
+        draw_precip_map(d, (WIDTH - MARGIN - MAP_W, 176, WIDTH - MARGIN, 340),
+                        snap.precip_grid)
+    draw_hourly_chart(d, (MARGIN, 176, chart_right, 340), snap.hourly,
                       show_gusts=False, grid_step=9)
 
     d.line((MARGIN, 354, WIDTH - MARGIN, 354), fill=BLACK, width=1)

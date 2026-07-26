@@ -3,12 +3,13 @@ avec fallback sur best_match si le modèle demandé est indisponible."""
 from __future__ import annotations
 
 import logging
+import math
 from datetime import date, datetime, timedelta
 
 import requests
 
 from .config import Config
-from .models import DailyPoint, HourlyPoint, RainAlert
+from .models import DailyPoint, HourlyPoint, PrecipGrid, RainAlert
 
 log = logging.getLogger(__name__)
 
@@ -19,6 +20,10 @@ MODEL_DAILY = "ecmwf_ifs025"
 FALLBACK = "best_match"
 
 HOURLY_VARS = "temperature_2m,precipitation,wind_gusts_10m"
+
+# Carte régionale : 24 × 13 cellules de 5 km, soit 120 × 65 km autour du domicile.
+# Les proportions sont calées sur la zone d'affichage pour des cellules carrées.
+GRID_COLS, GRID_ROWS, GRID_KM = 24, 13, 5.0
 DAILY_VARS = ("temperature_2m_min,temperature_2m_max,precipitation_sum,weather_code,"
               "sunrise,sunset")
 
@@ -96,6 +101,42 @@ def payload_to_hourly(data: dict) -> list[HourlyPoint]:
             gust=float(gust) if gust is not None else None,
         ))
     return points
+
+
+def fetch_precip_grid(cfg: Config) -> PrecipGrid | None:
+    """Champ de précipitations AROME autour du domicile, en une seule requête.
+
+    Open-Meteo accepte des listes de coordonnées : les 312 points reviennent
+    ensemble. Donnée décorative — None en cas d'échec, ni cache ni badge.
+    N'est appelée que lorsque de la pluie est attendue (voir collector), pour
+    rester très en deçà des quotas de l'offre gratuite.
+    """
+    km_per_lat = 111.2
+    km_per_lon = 111.32 * math.cos(math.radians(cfg.lat))
+    half_lat = (GRID_ROWS * GRID_KM / 2) / km_per_lat
+    half_lon = (GRID_COLS * GRID_KM / 2) / km_per_lon
+
+    lats, lons = [], []
+    for row in range(GRID_ROWS):        # ligne 0 = nord, comme à l'écran
+        for col in range(GRID_COLS):
+            lats.append(round(cfg.lat + half_lat
+                              - 2 * half_lat * (row + 0.5) / GRID_ROWS, 4))
+            lons.append(round(cfg.lon - half_lon
+                              + 2 * half_lon * (col + 0.5) / GRID_COLS, 4))
+    try:
+        data = _get(dict(latitude=",".join(map(str, lats)),
+                         longitude=",".join(map(str, lons)),
+                         models=MODEL_HOURLY, minutely_15="precipitation",
+                         forecast_minutely_15=2, timezone="Europe/Paris"))
+        if not isinstance(data, list) or len(data) != GRID_COLS * GRID_ROWS:
+            raise ValueError(f"grille incomplète ({len(data)} points)")
+        values = [(point.get("minutely_15", {}).get("precipitation")
+                   or [None])[0] or 0.0 for point in data]
+    except Exception as e:
+        log.warning("carte des précipitations indisponible : %s", e)
+        return None
+    return PrecipGrid(cols=GRID_COLS, rows=GRID_ROWS, km=GRID_KM, values=values,
+                      lat=cfg.lat, lon=cfg.lon)
 
 
 def payload_to_sun(data: dict) -> tuple[datetime | None, datetime | None]:

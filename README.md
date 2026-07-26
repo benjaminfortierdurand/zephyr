@@ -12,8 +12,18 @@ fait 800×480 en noir et blanc pur : c'est exactement ce que l'écran affiche.*
 | Zone | Contenu | Source |
 |---|---|---|
 | Bandeau haut | Température extérieure en très grand + écart aux normales de saison, humidité + température d'hier à la même heure, pièces intérieures (température, humidité, CO₂ — 2 max), date, heure de mise à jour, lever/coucher du soleil | Netatmo (mesures + historique `getmeasure`) + normales ERA5 1991-2020 |
-| Zone centrale | Graphique 24 h : courbe de température, barres de pluie, rafales de l'heure en cours (et pointe à venir si elle est nettement plus forte) ; cartouches « pluie vers HH:MM » (pas de 15 min) et conseil d'aération (thermique par temps chaud, CO₂ le soir — calculé depuis les capteurs Netatmo) | Open-Meteo, modèle AROME HD (`meteofrance_arome_france_hd`) |
+| Zone centrale | Graphique 24 h : courbe de température, barres de pluie, rafales de l'heure en cours (et pointe à venir si elle est nettement plus forte) ; cartouches « pluie vers HH:MM » (pas de 15 min) et conseil d'aération (thermique par temps chaud, CO₂ le soir — calculé depuis les capteurs Netatmo). Quand une averse approche, une **carte régionale** des précipitations occupe la droite de la zone | Open-Meteo, modèle AROME HD (`meteofrance_arome_france_hd`) |
 | Bandeau bas | 7 jours : picto WMO, min/max, cumul de pluie | Open-Meteo, modèle ECMWF (`ecmwf_ifs025`) |
+
+**Carte régionale.** Open-Meteo accepte une liste de coordonnées dans une seule
+requête : 312 points AROME espacés de 5 km (120 × 65 km autour du domicile)
+reviennent en une fraction de seconde. Le rendu emprunte les codes du radar —
+cercles de distance à 25 et 50 km, position du domicile, nord, échelle et
+quelques repères urbains — plutôt qu'un fond cartographique, illisible en 1 bit
+à cette taille. La grille n'est demandée **que lorsque de la pluie est attendue
+dans les 3 heures** : les jours secs ne coûtent aucune requête supplémentaire, ce
+qui garde le projet très à l'aise dans les quotas gratuits d'Open-Meteo. La liste
+des villes (`CITIES` dans `render/common.py`) est à adapter à sa propre région.
 
 > Le graphique n'affiche pas la couverture nuageuse : AROME HD ne fournit pas la
 > variable `cloud_cover` (l'API renvoie `null` sur toutes les heures), et afficher

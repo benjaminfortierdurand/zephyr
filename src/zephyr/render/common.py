@@ -12,7 +12,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-from ..models import DailyPoint, HourlyPoint
+from ..models import DailyPoint, HourlyPoint, PrecipGrid
 
 WIDTH, HEIGHT = 800, 480
 BLACK, WHITE = 0, 255
@@ -287,6 +287,92 @@ def draw_hourly_chart(d: ImageDraw.ImageDraw, box, hourly: list[HourlyPoint], *,
     # cadre bas + gauche
     d.line((px0, py0, px0, py1), fill=BLACK, width=1)
     d.line((px0, py1, px1, py1), fill=BLACK, width=1)
+
+
+# Repères urbains de la carte régionale — à adapter si l'on change de région.
+# Volontairement périphériques : au centre, la croix du domicile suffit, et deux
+# étiquettes à 10 km l'une de l'autre seraient illisibles à cette échelle.
+CITIES = [
+    ("Mantes", 48.990, 1.717),
+    ("Cergy", 49.036, 2.063),
+    ("Roissy", 49.010, 2.548),
+    ("Meaux", 48.960, 2.879),
+    ("Paris", 48.857, 2.352),
+    ("Melun", 48.541, 2.660),
+    ("Rambouillet", 48.644, 1.830),
+]
+
+
+def draw_precip_map(d: ImageDraw.ImageDraw, box, grid: PrecipGrid,
+                    cities=CITIES) -> None:
+    """Champ de précipitations façon radar plutôt que carte géographique.
+
+    Pas de fond cartographique : des cercles de distance, la position du
+    domicile, le nord et une échelle suffisent à lire la situation — et ça
+    évite d'embarquer des contours de départements illisibles en 1 bit.
+    """
+    x0, y0, x1, y1 = box
+    cw, ch = (x1 - x0) / grid.cols, (y1 - y0) / grid.rows
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    px_per_km = (x1 - x0) / (grid.cols * grid.km)
+
+    # cercles de portée dessinés en premier : la pluie passe par-dessus
+    for km in (25, 50):
+        r = km * px_per_km
+        for deg in range(0, 360, 4):
+            a = math.radians(deg)
+            px, py = cx + math.cos(a) * r, cy + math.sin(a) * r
+            if x0 < px < x1 and y0 < py < y1:
+                d.point((px, py), fill=BLACK)
+
+    for i, v in enumerate(grid.values):
+        row, col = divmod(i, grid.cols)
+        ax0, ay0 = round(x0 + col * cw), round(y0 + row * ch)
+        ax1, ay1 = round(x0 + (col + 1) * cw), round(y0 + (row + 1) * ch)
+        if v >= 1.0:                                   # forte
+            d.rectangle((ax0, ay0, ax1, ay1), fill=BLACK)
+        elif v >= 0.3:                                 # modérée
+            for x in range(ax0, ax1):
+                for y in range(ay0, ay1):
+                    if (x + y) % 3 == 0:
+                        d.point((x, y), fill=BLACK)
+        elif v >= 0.05:                                # faible
+            for x in range(ax0, ax1):
+                for y in range(ay0, ay1):
+                    if x % 4 == 0 and y % 4 == 0:
+                        d.point((x, y), fill=BLACK)
+
+    # repères urbains : point cerclé de blanc + nom sur fond blanc, sinon rien
+    # ne ressort d'une zone de pluie dense
+    if cities and grid.lat:
+        half_lat = (grid.rows * grid.km / 2) / 111.2
+        half_lon = (grid.cols * grid.km / 2) / (111.32 * math.cos(
+            math.radians(grid.lat)))
+        f_city = font(11)
+        for name, lat, lon in cities:
+            px = x0 + (lon - grid.lon + half_lon) / (2 * half_lon) * (x1 - x0)
+            py = y0 + (grid.lat + half_lat - lat) / (2 * half_lat) * (y1 - y0)
+            if not (x0 + 4 < px < x1 - 4 and y0 + 4 < py < y1 - 4):
+                continue
+            d.ellipse((px - 3, py - 3, px + 3, py + 3), fill=WHITE, outline=BLACK)
+            d.point((px, py), fill=BLACK)
+            # nom placé du côté qui reste dans le cadre
+            w = text_w(d, name, f_city)
+            tx, anchor = (px + 6, "lm") if px + 10 + w < x1 else (px - 6, "rm")
+            text_halo(d, (tx, py), name, f_city, anchor=anchor, pad=1)
+
+    # domicile : croix blanche cerclée, lisible aussi bien sur blanc que sur noir
+    d.ellipse((cx - 6, cy - 6, cx + 6, cy + 6), fill=WHITE, outline=BLACK, width=2)
+    d.line((cx - 3, cy, cx + 3, cy), fill=BLACK, width=2)
+    d.line((cx, cy - 3, cx, cy + 3), fill=BLACK, width=2)
+
+    d.rectangle((x0, y0, x1, y1), outline=BLACK, width=1)
+    f_n, f_km = font(12, bold=True), font(11)
+    d.rectangle((x0 + 1, y0 + 1, x0 + 15, y0 + 17), fill=WHITE)
+    d.text((x0 + 4, y0 + 2), "N", font=f_n, fill=BLACK)
+    lab = f"{round(grid.cols * grid.km)} km"
+    d.rectangle((x1 - text_w(d, lab, f_km) - 7, y1 - 15, x1 - 1, y1 - 1), fill=WHITE)
+    d.text((x1 - 4, y1 - 3), lab, font=f_km, fill=BLACK, anchor="rs")
 
 
 def draw_legend(d: ImageDraw.ImageDraw, x_right: int, y: int, items, fs: int = 13) -> None:
