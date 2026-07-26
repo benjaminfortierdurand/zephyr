@@ -342,6 +342,42 @@ def draw_precip_map(d: ImageDraw.ImageDraw, box, grid: PrecipGrid,
                     if x % 4 == 0 and y % 4 == 0:
                         d.point((x, y), fill=BLACK)
 
+    # position prévue dans une heure, en contour : le trait suit les bords des
+    # cellules pluvieuses de l'échéance, ce qui montre à la fois vers où la masse
+    # se déplace et si elle grossit ou se délite
+    if grid.ahead:
+        seuil = 0.15
+
+        def pluvieux(row: int, col: int) -> bool:
+            if not (0 <= row < grid.rows and 0 <= col < grid.cols):
+                return False
+            return grid.ahead[row * grid.cols + col] >= seuil
+
+        for i, v in enumerate(grid.ahead):
+            if v < seuil:
+                continue
+            row, col = divmod(i, grid.cols)
+            ax0, ay0 = round(x0 + col * cw), round(y0 + row * ch)
+            ax1, ay1 = round(x0 + (col + 1) * cw), round(y0 + (row + 1) * ch)
+            if not pluvieux(row - 1, col):
+                d.line((ax0, ay0, ax1, ay0), fill=BLACK, width=2)
+            if not pluvieux(row + 1, col):
+                d.line((ax0, ay1, ax1, ay1), fill=BLACK, width=2)
+            if not pluvieux(row, col - 1):
+                d.line((ax0, ay0, ax0, ay1), fill=BLACK, width=2)
+            if not pluvieux(row, col + 1):
+                d.line((ax1, ay0, ax1, ay1), fill=BLACK, width=2)
+
+    # coins réservés à l'habillage (nord, échelle, note) : un repère urbain qui
+    # y tomberait est omis plutôt que recouvert à moitié
+    f_n, f_km = font(12, bold=True), font(11)
+    scale_lab = f"{round(grid.cols * grid.km)} km"
+    note = f"contour : dans {grid.ahead_minutes} min" if grid.ahead else None
+    reserved = [(x0, y0, x0 + 16, y0 + 18),
+                (x1 - text_w(d, scale_lab, f_km) - 8, y1 - 16, x1, y1)]
+    if note:
+        reserved.append((x0, y1 - 16, x0 + text_w(d, note, f_km) + 8, y1))
+
     # repères urbains : point cerclé de blanc + nom sur fond blanc, sinon rien
     # ne ressort d'une zone de pluie dense
     if cities and grid.lat:
@@ -354,11 +390,15 @@ def draw_precip_map(d: ImageDraw.ImageDraw, box, grid: PrecipGrid,
             py = y0 + (grid.lat + half_lat - lat) / (2 * half_lat) * (y1 - y0)
             if not (x0 + 4 < px < x1 - 4 and y0 + 4 < py < y1 - 4):
                 continue
-            d.ellipse((px - 3, py - 3, px + 3, py + 3), fill=WHITE, outline=BLACK)
-            d.point((px, py), fill=BLACK)
             # nom placé du côté qui reste dans le cadre
             w = text_w(d, name, f_city)
             tx, anchor = (px + 6, "lm") if px + 10 + w < x1 else (px - 6, "rm")
+            lb = d.textbbox((tx, py), name, font=f_city, anchor=anchor)
+            if any(lb[0] <= rx1 and lb[2] >= rx0 and lb[1] <= ry1 and lb[3] >= ry0
+                   for rx0, ry0, rx1, ry1 in reserved):
+                continue
+            d.ellipse((px - 3, py - 3, px + 3, py + 3), fill=WHITE, outline=BLACK)
+            d.point((px, py), fill=BLACK)
             text_halo(d, (tx, py), name, f_city, anchor=anchor, pad=1)
 
     # domicile : croix blanche cerclée, lisible aussi bien sur blanc que sur noir
@@ -367,12 +407,15 @@ def draw_precip_map(d: ImageDraw.ImageDraw, box, grid: PrecipGrid,
     d.line((cx, cy - 3, cx, cy + 3), fill=BLACK, width=2)
 
     d.rectangle((x0, y0, x1, y1), outline=BLACK, width=1)
-    f_n, f_km = font(12, bold=True), font(11)
     d.rectangle((x0 + 1, y0 + 1, x0 + 15, y0 + 17), fill=WHITE)
     d.text((x0 + 4, y0 + 2), "N", font=f_n, fill=BLACK)
-    lab = f"{round(grid.cols * grid.km)} km"
-    d.rectangle((x1 - text_w(d, lab, f_km) - 7, y1 - 15, x1 - 1, y1 - 1), fill=WHITE)
-    d.text((x1 - 4, y1 - 3), lab, font=f_km, fill=BLACK, anchor="rs")
+    d.rectangle((x1 - text_w(d, scale_lab, f_km) - 7, y1 - 15, x1 - 1, y1 - 1),
+                fill=WHITE)
+    d.text((x1 - 4, y1 - 3), scale_lab, font=f_km, fill=BLACK, anchor="rs")
+    if note:
+        d.rectangle((x0 + 1, y1 - 15, x0 + text_w(d, note, f_km) + 7, y1 - 1),
+                    fill=WHITE)
+        d.text((x0 + 4, y1 - 3), note, font=f_km, fill=BLACK, anchor="ls")
 
 
 def draw_legend(d: ImageDraw.ImageDraw, x_right: int, y: int, items, fs: int = 13) -> None:
