@@ -52,7 +52,7 @@ def render(snap: Snapshot) -> Image.Image:
     d.text((rx0, 12), "PROCHAINES 24 H", font=font(15, bold=True), fill=BLACK)
     draw_legend(d, WIDTH - 14, 13,
                 [("line", "temp."), ("bar", "pluie"),
-                 ("hatch", "nuages"), ("dots", "raf.")])
+                 ("dots", "raf.")])
     draw_hourly_chart(d, (rx0, 40, WIDTH - 14, 282), snap.hourly)
 
     d.line((LEFT_W, 298, WIDTH, 298), fill=BLACK, width=2)

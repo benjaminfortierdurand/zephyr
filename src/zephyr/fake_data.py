@@ -7,10 +7,8 @@ from datetime import datetime, timedelta
 from .models import (CurrentConditions, DailyPoint, HourlyPoint, IndoorConditions,
                      RainAlert, Snapshot)
 
-# Couverture nuageuse (%) et rafales (km/h) heure par heure : une averse orageuse
-# passe environ 4-6 h après le début de la fenêtre, puis le ciel se dégage.
-_CLOUDS = [20, 25, 35, 55, 75, 90, 95, 80, 60, 45, 35, 30,
-           25, 20, 30, 45, 40, 30, 25, 20, 15, 15, 10, 10]
+# Rafales (km/h) heure par heure : une averse orageuse passe environ 4-6 h après
+# le début de la fenêtre, puis le vent retombe.
 _GUSTS = [22, 24, 26, 30, 38, 45, 41, 33, 28, 26, 24, 22,
           20, 19, 18, 17, 16, 15, 14, 14, 13, 12, 12, 11]
 _PRECIP = {4: 1.2, 5: 2.6, 6: 0.8, 15: 0.2}
@@ -43,7 +41,6 @@ def make_snapshot(stale: bool = False) -> Snapshot:
             temp=round(temp, 1),
             precip=_PRECIP.get(i, 0.0),
             gust=float(_GUSTS[i]),
-            cloud_cover=_CLOUDS[i],
         ))
 
     daily = [
