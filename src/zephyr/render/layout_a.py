@@ -113,7 +113,7 @@ def render(snap: Snapshot) -> Image.Image:
         px += pw + 10
     draw_legend(d, WIDTH - 20, 144,
                 [("line", "température"), ("bar", "pluie"),
-                 ("hatch", "nuages"), ("dots", "rafales")])
+                 ("dots", "rafales")])
     draw_hourly_chart(d, (20, 170, WIDTH - 20, 344), snap.hourly)
 
     d.line((16, 358, WIDTH - 16, 358), fill=BLACK, width=2)

@@ -182,17 +182,12 @@ def draw_wmo_icon(d: ImageDraw.ImageDraw, cx: float, cy: float, s: float,
 # ---------------------------------------------------------------- graphique 24 h
 
 def draw_hourly_chart(d: ImageDraw.ImageDraw, box, hourly: list[HourlyPoint], *,
-                      show_clouds: bool = True, show_gusts: bool = True,
-                      fs: int = 14, grid_step: int = 5, hour_step: int = 3) -> None:
+                      show_gusts: bool = True, fs: int = 14,
+                      grid_step: int = 5, hour_step: int = 3) -> None:
     x0, y0, x1, y1 = box
     ml, mr, mb = 34, 32, 20
-    # pas de bandeau si le modèle n'a pas fourni la couverture nuageuse : une
-    # bande vide se lirait « ciel dégagé » au lieu de « donnée absente »
-    show_clouds = show_clouds and any(h.cloud_cover is not None for h in hourly)
-    strip_h = 10 if show_clouds else 0
     px0, px1 = x0 + ml, x1 - mr
-    py0 = y0 + (strip_h + 6 if show_clouds else 0)
-    py1 = y1 - mb
+    py0, py1 = y0, y1 - mb
     slot = (px1 - px0) / len(hourly)
     centers = [px0 + (i + 0.5) * slot for i in range(len(hourly))]
 
@@ -221,28 +216,6 @@ def draw_hourly_chart(d: ImageDraw.ImageDraw, box, hourly: list[HourlyPoint], *,
             dotted_line(d, (centers[i], py0), (centers[i], py1), step=grid_step)
             d.text((centers[i], py1 + 4), f"{h.time.hour}h", font=f_lab,
                    fill=BLACK, anchor="ma")
-
-    # bandeau de couverture nuageuse
-    if show_clouds:
-        sy0, sy1 = y0, y0 + strip_h
-        for i, h in enumerate(hourly):
-            cx0, cx1 = round(px0 + i * slot), round(px0 + (i + 1) * slot)
-            c = h.cloud_cover
-            if c is None:
-                continue
-            if c >= 85:
-                d.rectangle((cx0, sy0, cx1, sy1), fill=BLACK)
-            elif c >= 55:
-                for x in range(cx0, cx1):
-                    for y in range(sy0, sy1 + 1):
-                        if (x + y) % 3 == 0:
-                            d.point((x, y), fill=BLACK)
-            elif c >= 25:
-                for x in range(cx0, cx1):
-                    for y in range(sy0, sy1 + 1):
-                        if x % 5 == 0 and y % 3 == 1:
-                            d.point((x, y), fill=BLACK)
-        d.rectangle((px0, sy0, px1, sy1), outline=BLACK, width=1)
 
     # barres de précipitations (échelle à droite) ; un repère dont la hauteur
     # coïncide avec l'arrivée de la courbe de température est omis (canicule :
@@ -313,7 +286,7 @@ def draw_hourly_chart(d: ImageDraw.ImageDraw, box, hourly: list[HourlyPoint], *,
 
 
 def draw_legend(d: ImageDraw.ImageDraw, x_right: int, y: int, items, fs: int = 13) -> None:
-    """Légende alignée à droite. items = [(kind, label)], kind ∈ line|bar|hatch|dots."""
+    """Légende alignée à droite. items = [(kind, label)], kind ∈ line|bar|dots."""
     f = font(fs)
     total = sum(22 + text_w(d, label, f) + 16 for _, label in items) - 16
     x = x_right - total
@@ -323,12 +296,6 @@ def draw_legend(d: ImageDraw.ImageDraw, x_right: int, y: int, items, fs: int = 1
             d.line((x, gy, x + 16, gy), fill=BLACK, width=3)
         elif kind == "bar":
             d.rectangle((x + 4, y, x + 12, y + fs), fill=BLACK)
-        elif kind == "hatch":
-            for xx in range(x, x + 17):
-                for yy in range(y + 2, y + fs - 1):
-                    if (xx + yy) % 3 == 0:
-                        d.point((xx, yy), fill=BLACK)
-            d.rectangle((x, y + 2, x + 16, y + fs - 1), outline=BLACK, width=1)
         elif kind == "dots":
             for k in range(4):
                 d.point((x + 2 + k * 5, gy), fill=BLACK)

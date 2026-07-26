@@ -18,7 +18,7 @@ MODEL_HOURLY = "meteofrance_arome_france_hd"
 MODEL_DAILY = "ecmwf_ifs025"
 FALLBACK = "best_match"
 
-HOURLY_VARS = "temperature_2m,precipitation,wind_gusts_10m,cloud_cover"
+HOURLY_VARS = "temperature_2m,precipitation,wind_gusts_10m"
 DAILY_VARS = ("temperature_2m_min,temperature_2m_max,precipitation_sum,weather_code,"
               "sunrise,sunset")
 
@@ -68,9 +68,8 @@ def _check(data: dict, section: str, key: str, minimum: int) -> None:
 def payload_to_hourly(data: dict) -> list[HourlyPoint]:
     h = data["hourly"]
     points = []
-    for t, temp, precip, gust, cloud in zip(h["time"], h["temperature_2m"],
-                                            h["precipitation"], h["wind_gusts_10m"],
-                                            h["cloud_cover"]):
+    for t, temp, precip, gust in zip(h["time"], h["temperature_2m"],
+                                     h["precipitation"], h["wind_gusts_10m"]):
         if temp is None:
             continue
         points.append(HourlyPoint(
@@ -78,9 +77,6 @@ def payload_to_hourly(data: dict) -> list[HourlyPoint]:
             temp=float(temp),
             precip=float(precip or 0.0),
             gust=float(gust or 0.0),
-            # jamais `or 0` : AROME HD ne fournit pas cloud_cover, et un 0 fabriqué
-            # s'afficherait comme un ciel parfaitement dégagé
-            cloud_cover=int(cloud) if cloud is not None else None,
         ))
     return points
 

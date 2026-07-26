@@ -7,8 +7,13 @@ HAT V2** (driver `epd7in5_V2`), rafraîchi toutes les 10 minutes par un timer sy
 | Zone | Contenu | Source |
 |---|---|---|
 | Bandeau haut | Température extérieure en très grand + écart aux normales de saison, humidité + température d'hier à la même heure, pièces intérieures (température, humidité, CO₂ — 2 max), date, heure de mise à jour, lever/coucher du soleil | Netatmo (mesures + historique `getmeasure`) + normales ERA5 1991-2020 |
-| Zone centrale | Graphique 24 h : courbe de température, barres de pluie, bandeau de couverture nuageuse, rafales de l'heure en cours (et pointe à venir si elle est nettement plus forte) ; cartouches « pluie vers HH:MM » (pas de 15 min) et conseil d'aération (thermique par temps chaud, CO₂ le soir — calculé depuis les capteurs Netatmo) | Open-Meteo, modèle AROME HD (`meteofrance_arome_france_hd`) |
+| Zone centrale | Graphique 24 h : courbe de température, barres de pluie, rafales de l'heure en cours (et pointe à venir si elle est nettement plus forte) ; cartouches « pluie vers HH:MM » (pas de 15 min) et conseil d'aération (thermique par temps chaud, CO₂ le soir — calculé depuis les capteurs Netatmo) | Open-Meteo, modèle AROME HD (`meteofrance_arome_france_hd`) |
 | Bandeau bas | 7 jours : picto WMO, min/max, cumul de pluie | Open-Meteo, modèle ECMWF (`ecmwf_ifs025`) |
+
+> Le graphique n'affiche pas la couverture nuageuse : AROME HD ne fournit pas la
+> variable `cloud_cover` (l'API renvoie `null` sur toutes les heures), et afficher
+> une bande vide reviendrait à annoncer un ciel dégagé. L'ensoleillement se lit sur
+> les pictogrammes de la rangée 7 jours.
 
 Si un modèle Open-Meteo est indisponible, repli automatique sur `best_match`. Si une
 source est en échec (réseau, API), le dernier payload est relu depuis le cache disque
