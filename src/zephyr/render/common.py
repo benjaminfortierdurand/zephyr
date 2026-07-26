@@ -186,6 +186,9 @@ def draw_hourly_chart(d: ImageDraw.ImageDraw, box, hourly: list[HourlyPoint], *,
                       fs: int = 14, grid_step: int = 5, hour_step: int = 3) -> None:
     x0, y0, x1, y1 = box
     ml, mr, mb = 34, 32, 20
+    # pas de bandeau si le modèle n'a pas fourni la couverture nuageuse : une
+    # bande vide se lirait « ciel dégagé » au lieu de « donnée absente »
+    show_clouds = show_clouds and any(h.cloud_cover is not None for h in hourly)
     strip_h = 10 if show_clouds else 0
     px0, px1 = x0 + ml, x1 - mr
     py0 = y0 + (strip_h + 6 if show_clouds else 0)
@@ -225,6 +228,8 @@ def draw_hourly_chart(d: ImageDraw.ImageDraw, box, hourly: list[HourlyPoint], *,
         for i, h in enumerate(hourly):
             cx0, cx1 = round(px0 + i * slot), round(px0 + (i + 1) * slot)
             c = h.cloud_cover
+            if c is None:
+                continue
             if c >= 85:
                 d.rectangle((cx0, sy0, cx1, sy1), fill=BLACK)
             elif c >= 55:
@@ -245,12 +250,14 @@ def draw_hourly_chart(d: ImageDraw.ImageDraw, box, hourly: list[HourlyPoint], *,
     pmax = max(2.0, math.ceil(max(h.precip for h in hourly)))
     mm_step = 1 if pmax <= 3 else 2
     curve_edge_y = y_of(temps[-1])
+    d.text((px1 + 6, y0 + 1), "mm", font=font(fs - 2), fill=BLACK, anchor="la")
     for mm in range(mm_step, int(pmax) + 1, mm_step):
         y = py1 - mm / pmax * (py1 - py0) * 0.9
-        if abs(y - curve_edge_y) < 13:
+        # un repère est omis s'il tombe sur l'arrivée de la courbe ou sur
+        # l'étiquette « mm » (cette dernière est collée au haut du cadre)
+        if abs(y - curve_edge_y) < 13 or y < y0 + fs + 3:
             continue
         d.text((px1 + 6, y), str(mm), font=f_lab, fill=BLACK, anchor="lm")
-    d.text((px1 + 6, y0 + 1), "mm", font=font(fs - 2), fill=BLACK, anchor="la")
     for i, h in enumerate(hourly):
         if h.precip <= 0:
             continue

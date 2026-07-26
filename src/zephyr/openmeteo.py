@@ -78,7 +78,9 @@ def payload_to_hourly(data: dict) -> list[HourlyPoint]:
             temp=float(temp),
             precip=float(precip or 0.0),
             gust=float(gust or 0.0),
-            cloud_cover=int(cloud or 0),
+            # jamais `or 0` : AROME HD ne fournit pas cloud_cover, et un 0 fabriqué
+            # s'afficherait comme un ciel parfaitement dégagé
+            cloud_cover=int(cloud) if cloud is not None else None,
         ))
     return points
 
