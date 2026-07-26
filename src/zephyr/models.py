@@ -32,7 +32,7 @@ class HourlyPoint:
     temp: float        # °C
     precip: float      # mm
     gust: float        # km/h
-    cloud_cover: int   # %
+    cloud_cover: int | None  # % — None si le modèle ne fournit pas la variable
 
 
 @dataclass
