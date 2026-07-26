@@ -220,7 +220,8 @@ def draw_hourly_chart(d: ImageDraw.ImageDraw, box, hourly: list[HourlyPoint], *,
     # barres de précipitations (échelle à droite) ; un repère dont la hauteur
     # coïncide avec l'arrivée de la courbe de température est omis (canicule :
     # la courbe finit en haut à droite, pile dans la zone des étiquettes mm)
-    pmax = max(2.0, math.ceil(max(h.precip for h in hourly)))
+    precips = [h.precip for h in hourly if h.precip is not None]
+    pmax = max(2.0, math.ceil(max(precips))) if precips else 2.0
     mm_step = 1 if pmax <= 3 else 2
     curve_edge_y = y_of(temps[-1])
     d.text((px1 + 6, y0 + 1), "mm", font=font(fs - 2), fill=BLACK, anchor="la")
@@ -232,7 +233,7 @@ def draw_hourly_chart(d: ImageDraw.ImageDraw, box, hourly: list[HourlyPoint], *,
             continue
         d.text((px1 + 6, y), str(mm), font=f_lab, fill=BLACK, anchor="lm")
     for i, h in enumerate(hourly):
-        if h.precip <= 0:
+        if h.precip is None or h.precip <= 0:   # None : heure sans donnée, pas de barre
             continue
         bh = h.precip / pmax * (py1 - py0) * 0.9
         bw = slot * 0.30
@@ -254,14 +255,17 @@ def draw_hourly_chart(d: ImageDraw.ImageDraw, box, hourly: list[HourlyPoint], *,
 
     hi_xy, lo_xy = _extreme_xy(i_hi, -14), _extreme_xy(i_lo, 14)
 
-    # rafales : courbe pointillée sur échelle propre (annotation du maximum)
-    if show_gusts:
-        gmax = max(h.gust for h in hourly)
+    # rafales : courbe pointillée sur échelle propre (annotation du maximum).
+    # Les heures sans donnée laissent un trou dans la courbe plutôt qu'un zéro.
+    gusts = [(i, h.gust) for i, h in enumerate(hourly) if h.gust is not None]
+    if show_gusts and gusts:
+        gmax = max(g for _, g in gusts)
         gy = lambda g: py1 - g / (gmax * 1.25) * (py1 - py0)
-        gpts = [(centers[i], gy(h.gust)) for i, h in enumerate(hourly)]
-        for p0, p1 in zip(gpts, gpts[1:]):
-            dotted_line(d, p0, p1, step=4)
-        i_max = max(range(len(hourly)), key=lambda i: hourly[i].gust)
+        gpts = {i: (centers[i], gy(g)) for i, g in gusts}
+        for i in range(len(hourly) - 1):
+            if i in gpts and i + 1 in gpts:
+                dotted_line(d, gpts[i], gpts[i + 1], step=4)
+        i_max = max((i for i, _ in gusts), key=lambda i: hourly[i].gust)
         # à côté du pic, à sa hauteur : ni sur les barres de pluie (dessous),
         # ni dans le coin haut-droit (réservé aux étiquettes d'axe et de température)
         side = 38 if centers[i_max] < (px0 + px1) / 2 else -38
