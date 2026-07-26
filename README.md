@@ -20,7 +20,10 @@ requête : 312 points AROME espacés de 5 km (120 × 65 km autour du domicile)
 reviennent en une fraction de seconde. Le rendu emprunte les codes du radar —
 cercles de distance à 25 et 50 km, position du domicile, nord, échelle et
 quelques repères urbains — plutôt qu'un fond cartographique, illisible en 1 bit
-à cette taille. La grille n'est demandée **que lorsque de la pluie est attendue
+à cette taille. La position prévue **une heure plus tard** est superposée en
+contour : plutôt que d'estimer un vecteur de déplacement (trompeur quand une
+averse se forme ou se dissipe sur place), on montre les deux échéances du modèle,
+ce qui donne à la fois la direction et l'évolution de la masse. La grille n'est demandée **que lorsque de la pluie est attendue
 dans les 3 heures** : les jours secs ne coûtent aucune requête supplémentaire, ce
 qui garde le projet très à l'aise dans les quotas gratuits d'Open-Meteo. La liste
 des villes (`CITIES` dans `render/common.py`) est à adapter à sa propre région.

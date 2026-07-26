@@ -47,9 +47,11 @@ class PrecipGrid:
     cols: int
     rows: int
     km: float                  # côté d'une cellule
-    values: list[float]
+    values: list[float]        # champ actuel
     lat: float = 0.0           # centre de la carte (pour projeter les repères)
     lon: float = 0.0
+    ahead: list[float] | None = None   # même champ une heure plus tard
+    ahead_minutes: int = 60
 
 
 @dataclass

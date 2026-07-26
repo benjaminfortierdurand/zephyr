@@ -24,6 +24,7 @@ HOURLY_VARS = "temperature_2m,precipitation,wind_gusts_10m"
 # Carte régionale : 24 × 13 cellules de 5 km, soit 120 × 65 km autour du domicile.
 # Les proportions sont calées sur la zone d'affichage pour des cellules carrées.
 GRID_COLS, GRID_ROWS, GRID_KM = 24, 13, 5.0
+GRID_AHEAD_MIN = 60          # échéance superposée en contour, pour voir venir
 DAILY_VARS = ("temperature_2m_min,temperature_2m_max,precipitation_sum,weather_code,"
               "sunrise,sunset")
 
@@ -123,20 +124,26 @@ def fetch_precip_grid(cfg: Config) -> PrecipGrid | None:
                               - 2 * half_lat * (row + 0.5) / GRID_ROWS, 4))
             lons.append(round(cfg.lon - half_lon
                               + 2 * half_lon * (col + 0.5) / GRID_COLS, 4))
+    steps = GRID_AHEAD_MIN // 15 + 1        # instant courant + échéance à afficher
     try:
         data = _get(dict(latitude=",".join(map(str, lats)),
                          longitude=",".join(map(str, lons)),
                          models=MODEL_HOURLY, minutely_15="precipitation",
-                         forecast_minutely_15=2, timezone="Europe/Paris"))
+                         forecast_minutely_15=steps, timezone="Europe/Paris"))
         if not isinstance(data, list) or len(data) != GRID_COLS * GRID_ROWS:
             raise ValueError(f"grille incomplète ({len(data)} points)")
-        values = [(point.get("minutely_15", {}).get("precipitation")
-                   or [None])[0] or 0.0 for point in data]
+        series = [point.get("minutely_15", {}).get("precipitation") or []
+                  for point in data]
+        values = [(s[0] if s else None) or 0.0 for s in series]
+        # l'échéance manque si le modèle ne va pas assez loin : on s'en passe
+        ahead = ([(s[steps - 1] if len(s) >= steps else None) or 0.0 for s in series]
+                 if all(len(s) >= steps for s in series) else None)
     except Exception as e:
         log.warning("carte des précipitations indisponible : %s", e)
         return None
     return PrecipGrid(cols=GRID_COLS, rows=GRID_ROWS, km=GRID_KM, values=values,
-                      lat=cfg.lat, lon=cfg.lon)
+                      lat=cfg.lat, lon=cfg.lon, ahead=ahead,
+                      ahead_minutes=GRID_AHEAD_MIN)
 
 
 def payload_to_sun(data: dict) -> tuple[datetime | None, datetime | None]:
