@@ -36,6 +36,7 @@ def fetch_hourly(cfg: Config, model: str = MODEL_HOURLY) -> dict:
                          minutely_15="precipitation", forecast_minutely_15=8,
                          timezone="Europe/Paris"))
         _check(data, "hourly", "temperature_2m", minimum=12)
+        _warn_absent(data, "hourly", HOURLY_VARS)
         return data
     except (requests.RequestException, ValueError) as e:
         if model == FALLBACK:
@@ -50,6 +51,7 @@ def fetch_daily(cfg: Config, model: str = MODEL_DAILY) -> dict:
                          daily=DAILY_VARS, forecast_days=7,
                          timezone="Europe/Paris"))
         _check(data, "daily", "temperature_2m_max", minimum=5)
+        _warn_absent(data, "daily", DAILY_VARS)
         return data
     except (requests.RequestException, ValueError) as e:
         if model == FALLBACK:
@@ -65,6 +67,21 @@ def _check(data: dict, section: str, key: str, minimum: int) -> None:
         raise ValueError(f"réponse {section} vide ou incomplète")
 
 
+def _warn_absent(data: dict, section: str, requested: str) -> None:
+    """Journalise les variables demandées que le modèle n'a pas fournies.
+
+    C'est exactement ce contrôle qui manquait le jour où AROME HD a cessé de
+    fournir `cloud_cover` : l'API répondait 200, le champ était plein de null,
+    et le code les prenait pour des zéros. Une variable entièrement absente est
+    désormais visible dans les journaux (`journalctl -u zephyr.service`).
+    """
+    block = data.get(section) or {}
+    absent = [name for name in requested.split(",")
+              if all(v is None for v in (block.get(name) or [None]))]
+    if absent:
+        log.warning("%s : le modèle ne fournit pas %s", section, ", ".join(absent))
+
+
 def payload_to_hourly(data: dict) -> list[HourlyPoint]:
     h = data["hourly"]
     points = []
@@ -75,8 +92,8 @@ def payload_to_hourly(data: dict) -> list[HourlyPoint]:
         points.append(HourlyPoint(
             time=datetime.fromisoformat(t),
             temp=float(temp),
-            precip=float(precip or 0.0),
-            gust=float(gust or 0.0),
+            precip=float(precip) if precip is not None else None,
+            gust=float(gust) if gust is not None else None,
         ))
     return points
 

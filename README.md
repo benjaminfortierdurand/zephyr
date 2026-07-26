@@ -4,6 +4,11 @@ Dashboard météo 800×480 (1-bit) pour Raspberry Pi 4 + écran **Waveshare 7.5�
 HAT V2** (driver `epd7in5_V2`), rafraîchi toutes les 10 minutes par un timer systemd
 (le rythme de mesure de la station Netatmo).
 
+![Aperçu du dashboard](docs/apercu.png)
+
+*Rendu réel du programme, en données de démonstration (`--dev --fake`). L'image
+fait 800×480 en noir et blanc pur : c'est exactement ce que l'écran affiche.*
+
 | Zone | Contenu | Source |
 |---|---|---|
 | Bandeau haut | Température extérieure en très grand + écart aux normales de saison, humidité + température d'hier à la même heure, pièces intérieures (température, humidité, CO₂ — 2 max), date, heure de mise à jour, lever/coucher du soleil | Netatmo (mesures + historique `getmeasure`) + normales ERA5 1991-2020 |
@@ -48,6 +53,8 @@ src/zephyr/
   fake_data.py        # données factices (mode démo)
   preview.py          # aperçu des 3 variantes de layout
   render/             # polices, icônes WMO vectorielles, graphique, layouts a/b/c/d
+docs/
+  apercu.png          # capture du README, régénérée par `--dev --fake`
 deploy/
   zephyr.service      # unité systemd (Type=oneshot)
   zephyr.timer        # toutes les 10 min (OnUnitActiveSec)

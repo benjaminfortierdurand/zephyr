@@ -84,9 +84,10 @@ def render(snap: Snapshot) -> Image.Image:
     # nettement plus forte — sinon on annoncerait un coup de vent nocturne
     # comme s'il soufflait maintenant
     gust_w = 0
-    if snap.hourly:
+    if snap.hourly and snap.hourly[0].gust is not None:
         now_gust = round(snap.hourly[0].gust)
-        peak = max(snap.hourly, key=lambda h: h.gust)
+        peak = max((h for h in snap.hourly if h.gust is not None),
+                   key=lambda h: h.gust)
         gust_s = f"rafales {now_gust} km/h"
         if round(peak.gust) >= max(30, now_gust * 1.4):
             gust_s += f" · {round(peak.gust)} à {peak.time.hour}h"

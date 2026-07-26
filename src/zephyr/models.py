@@ -29,9 +29,12 @@ class IndoorConditions:
 class HourlyPoint:
     """Une heure de prévision AROME HD."""
     time: datetime
-    temp: float        # °C
-    precip: float      # mm
-    gust: float        # km/h
+    # temp est obligatoire (un point sans température est écarté à la collecte) ;
+    # precip et gust valent None quand le modèle ne les fournit pas — surtout pas 0,
+    # qui s'afficherait comme « pas de pluie » ou « pas de vent »
+    temp: float             # °C
+    precip: float | None    # mm
+    gust: float | None      # km/h
 
 
 @dataclass
