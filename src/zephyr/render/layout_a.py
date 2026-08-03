@@ -70,7 +70,8 @@ def render(snap: Snapshot) -> Image.Image:
     d.text((WIDTH - 20, 14), date_s, font=f_date, fill=BLACK, anchor="ra")
     d.text((WIDTH - 20, 46), maj_s, font=f_maj, fill=BLACK, anchor="ra")
     if snap.stale:
-        draw_stale_badge(d, WIDTH - 20, 72, snap.stale_since)
+        draw_stale_badge(d, WIDTH - 20, 72, snap.stale_since,
+                         source=snap.stale_source)
     if snap.sunrise and snap.sunset:
         sun_s = f"{snap.sunrise:%H:%M} → {snap.sunset:%H:%M}"
         f_sun = font(14)

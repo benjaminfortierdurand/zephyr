@@ -72,11 +72,22 @@ def collect(cfg: Config) -> Snapshot:
     if future:
         hourly = future
 
-    stale_dates = [r.fetched_at for r in (cur_r, hr_r, dy_r) if r.stale]
-    # station en ligne mais mesure trop vieille (module HS, pile vide…)
-    if not cur_r.stale and now - current.measured_at > NETATMO_MAX_AGE:
-        log.warning("mesure Netatmo datée de %s — marquée périmée", current.measured_at)
-        stale_dates.append(current.measured_at)
+    # Les sources périmées sont nommées : savoir que la station est muette mais
+    # que les prévisions sont fraîches change ce qu'on lit sur l'écran. Les deux
+    # appels Open-Meteo comptent pour une seule source aux yeux du lecteur.
+    perimees: list[tuple[str, datetime]] = []
+    if cur_r.stale:
+        perimees.append(("NETATMO", cur_r.fetched_at))
+    elif now - current.measured_at > NETATMO_MAX_AGE:
+        # station en ligne mais mesure trop vieille (module HS, pile vide…)
+        log.warning("mesure Netatmo datée de %s, marquée périmée", current.measured_at)
+        perimees.append(("NETATMO", current.measured_at))
+    for r in (hr_r, dy_r):
+        if r.stale:
+            perimees.append(("PRÉVISIONS", r.fetched_at))
+
+    noms = {nom for nom, _ in perimees}
+    stale_dates = [quand for _, quand in perimees]
 
     return Snapshot(
         current=current,
@@ -85,6 +96,7 @@ def collect(cfg: Config) -> Snapshot:
         generated_at=now,
         stale=bool(stale_dates),
         stale_since=min(stale_dates) if stale_dates else None,
+        stale_source=next(iter(noms)) if len(noms) == 1 else None,
         indoor=indoor,
         rain_soon=rain_soon,
         precip_grid=grid,

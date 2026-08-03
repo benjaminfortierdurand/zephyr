@@ -80,6 +80,7 @@ class Snapshot:
     generated_at: datetime
     stale: bool = False                    # au moins une source servie depuis le cache
     stale_since: datetime | None = None    # date du payload le plus ancien utilisé
+    stale_source: str | None = None        # laquelle, si une seule est concernée
     indoor: list[IndoorConditions] = field(default_factory=list)  # pièces intérieures
     rain_soon: RainAlert | None = None     # pluie dans l'heure à venir (AROME 15 min)
     normals_delta: float | None = None     # écart du max du jour aux normales 1991-2020
