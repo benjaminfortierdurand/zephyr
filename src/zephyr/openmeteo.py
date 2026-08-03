@@ -181,24 +181,23 @@ def payload_to_rain_alert(data: dict, now: datetime) -> RainAlert | None:
     return None
 
 
-def payload_to_today_extremes(data: dict, day: date) -> tuple[float, float] | None:
-    """Min/max AROME du jour demandé, ou None s'ils ne sont pas disponibles.
+def payload_to_daily_extremes(data: dict) -> dict[date, tuple[float, float]]:
+    """Min/max AROME par date, pour les jours où le modèle les fournit.
 
-    La date est vérifiée explicitement : un payload servi depuis le cache peut
-    dater de la veille, auquel cas on préfère laisser ECMWF que d'afficher les
-    extrêmes d'hier.
+    AROME porte à deux jours ; au-delà les valeurs sont nulles et absentes du
+    résultat. Les dates sont reprises telles quelles du payload, ce qui suffit
+    à écarter un cache de la veille : sa date ne correspondra à aucun des jours
+    affichés, et ECMWF gardera la main.
     """
     block = data.get("daily") or {}
     mins = block.get("temperature_2m_min") or []
     maxs = block.get("temperature_2m_max") or []
+    out: dict[date, tuple[float, float]] = {}
     for i, t in enumerate(block.get("time") or []):
-        if date.fromisoformat(t) != day:
-            continue
         if i < len(mins) and i < len(maxs) \
                 and mins[i] is not None and maxs[i] is not None:
-            return float(mins[i]), float(maxs[i])
-        return None
-    return None
+            out[date.fromisoformat(t)] = (float(mins[i]), float(maxs[i]))
+    return out
 
 
 def payload_to_daily(data: dict) -> list[DailyPoint]:
