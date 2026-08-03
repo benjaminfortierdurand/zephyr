@@ -1,4 +1,4 @@
-# Projet Zephyr station météo e-ink
+# Projet Zephyr : station météo e-ink
 
 Dashboard météo 800×480 (1-bit) pour Raspberry Pi 4 + écran **Waveshare 7.5″ e-Paper
 HAT V2** (driver `epd7in5_V2`), rafraîchi toutes les 10 minutes par un timer systemd
@@ -11,7 +11,7 @@ fait 800×480 en noir et blanc pur : c'est exactement ce que l'écran affiche.*
 
 | Zone | Contenu | Source |
 |---|---|---|
-| Bandeau haut | Température extérieure en très grand + écart aux normales de saison, humidité + température d'hier à la même heure, pièces intérieures (température, humidité, CO₂ 2 max), date, heure de mise à jour, lever/coucher du soleil | Netatmo (mesures + historique `getmeasure`) + normales ERA5 1991-2020 |
+| Bandeau haut | Température extérieure en très grand + écart aux normales de saison, humidité + température d'hier à la même heure, pièces intérieures (température, humidité, CO₂ ; 2 au maximum), date, heure de mise à jour, lever/coucher du soleil | Netatmo (mesures + historique `getmeasure`) + normales ERA5 1991-2020 |
 | Zone centrale | Graphique 24 h : courbe de température, barres de pluie, rafales de l'heure en cours (et pointe à venir si elle est nettement plus forte) ; cartouches « pluie vers HH:MM » (pas de 15 min) et conseil d'aération (thermique par temps chaud, CO₂ le soir, calculé depuis les capteurs Netatmo). Quand une averse approche, une **carte régionale** des précipitations occupe la droite de la zone | Open-Meteo, modèle AROME HD (`meteofrance_arome_france_hd`) |
 | Bandeau bas | 7 jours : picto WMO, min/max, cumul de pluie. Les min/max **du jour même** viennent d'AROME, pour rester cohérents avec la courbe juste au-dessus | Open-Meteo, ECMWF (`ecmwf_ifs025`) + AROME HD pour aujourd'hui |
 
@@ -30,8 +30,8 @@ le soir).
 **Carte régionale.** Open-Meteo accepte une liste de coordonnées dans une seule
 requête : 312 points AROME espacés de 5 km (120 × 65 km autour du domicile)
 reviennent en une fraction de seconde. Le rendu emprunte les codes du radar
-cercles de distance à 25 et 50 km, position du domicile, nord, échelle et
-quelques repères urbains, plutôt qu'un fond cartographique, illisible en 1 bit
+(cercles de distance à 25 et 50 km, position du domicile, nord, échelle et
+quelques repères urbains) plutôt qu'un fond cartographique, illisible en 1 bit
 à cette taille. La position prévue **une heure plus tard** est superposée en
 contour : plutôt que d'estimer un vecteur de déplacement (trompeur quand une
 averse se forme ou se dissipe sur place), on montre les deux échéances du modèle,
@@ -56,8 +56,8 @@ lancement depuis l'archive ERA5 d'Open-Meteo, un unique gros appel, puis mises e
 cache définitivement dans `data/normals.json` ; si cet appel échoue, l'écart n'est
 simplement pas affiché et un nouvel essai a lieu au cycle suivant.
 
-La **pression** n'est plus affichée (peu consultée) mais reste collectée et en cache, 
-la ré-afficher tient en quelques lignes dans `render/layout_a.py`.
+La **pression** n'est plus affichée (peu consultée) mais reste collectée et en
+cache : la ré-afficher tient en quelques lignes dans `render/layout_a.py`.
 
 L'écran est piloté exclusivement en **full refresh** (anti-ghosting) puis mis en veille
 entre deux cycles. Le rendu est fait en niveaux de gris avec Pillow puis binarisé par
@@ -98,8 +98,8 @@ python -m venv .venv
 Le layout actif est la variante **D « Épuré »** (`--layout a|b|c|d` pour comparer).
 Elle dérive de la variante A avec moins de traits : pas de légende ni de courbe de
 rafales (elles passent en statistique sur la ligne de titre), pas de filets
-verticaux, grille deux fois moins dense, et une hiérarchie en trois zones,
-héros / pièces intérieures / métadonnées.
+verticaux, grille deux fois moins dense, et une hiérarchie en trois zones :
+héros, pièces intérieures, métadonnées.
 
 ### Aperçu continu (« écran virtuel » sans matériel)
 
@@ -109,7 +109,7 @@ héros / pièces intérieures / métadonnées.
 
 régénère `out/dashboard.png` toutes les 15 minutes (Ctrl-C pour arrêter), et écrit
 `out/preview.html` : ouvrez ce fichier dans un navigateur (double-clic), l'image se
-recharge toute seule, aucun serveur web. Un cycle en échec (réseau coupé…) est loggué
+recharge toute seule, sans aucun serveur web. Un cycle en échec (réseau coupé…) est loggué
 et retenté au cycle suivant. Inutile de descendre sous ~10 minutes : Netatmo ne publie
 une nouvelle mesure que toutes les 10 minutes environ.
 
@@ -124,7 +124,7 @@ une nouvelle mesure que toutes les 10 minutes environ.
    effacée).
 3. À la question « Would you like to apply OS customisation settings? » → **Edit
    settings** :
-   - hostname : `zephyr` — le Pi sera joignable en `zephyr.local`
+   - hostname : `zephyr`, le Pi sera joignable en `zephyr.local`
    - utilisateur : `benfd` + mot de passe (doit correspondre à `User=` dans
      `deploy/zephyr.service`)
    - Wi-Fi : SSID + mot de passe, pays `FR` (inutile si câble Ethernet)
@@ -144,8 +144,8 @@ sudo raspi-config
 
 Depuis le poste Windows (adapter `benfd@zephyr.local` : utilisateur et nom d'hôte
 choisis au flashage de la carte SD). Ne pas copier `.venv/` (binaires Windows) ;
-copier impérativement `data/netatmo_token.json` s'il existe c'est lui qui contient
-le refresh token Netatmo à jour, celui du `.env` ayant déjà été consommé :
+copier impérativement `data/netatmo_token.json` s'il existe : c'est lui qui contient
+le refresh token Netatmo à jour, celui du `.env` ayant déjà été consommé.
 
 ```bash
 ssh benfd@zephyr.local "mkdir -p ~/zephyr/data"
@@ -180,7 +180,8 @@ Le Pi doit être à l'heure locale : `sudo timedatectl set-timezone Europe/Paris
 
 ### 4. Créer l'application Netatmo et obtenir le refresh token
 
-*(déjà fait si `.env` et `data/netatmo_token.json` ont été copiés depuis le poste dev passer à l'étape suivante)*
+*(déjà fait si `.env` et `data/netatmo_token.json` ont été copiés depuis le poste
+dev ; passer à l'étape suivante)*
 
 1. Aller sur <https://dev.netatmo.com>, se connecter avec le compte de la station.
 2. **My apps → Create** : nom/description libres. Récupérer **client ID** et
@@ -195,7 +196,7 @@ nano .env   # NETATMO_CLIENT_ID, NETATMO_CLIENT_SECRET, NETATMO_REFRESH_TOKEN
 ```
 
 **Pièces intérieures** : le bandeau affiche jusqu'à deux pièces (station de base
-incluse c'est elle qui mesure le salon en général). Attention : l'API météo
+incluse : c'est elle qui mesure le salon en général). Attention, l'API météo
 n'expose **pas** les noms de pièces de l'app ; elle renvoie le `module_name` de
 chaque module, et pour la base souvent un `station_name` auto-généré du genre
 « Maison (Indoor) ». D'où l'alias d'affichage dans `.env` :
@@ -230,7 +231,7 @@ cd /home/benfd/zephyr
 
 ### 5 bis. Tester depuis le PC en attendant l'écran (facultatif)
 
-Le Pi génère, le PC regarde sans matériel ni vrai serveur web (module standard
+Le Pi génère, le PC regarde, sans matériel ni vrai serveur web (module standard
 Python, temporaire, disparaît au reboot) :
 
 ```bash
@@ -253,7 +254,7 @@ pkill -f "zephyr.main --dev --watch" ; pkill -f "http.server 8000"
    nappe de la dalle à fond (contacts côté carte, suivre la sérigraphie), rabattre
    le loquet. La nappe est fragile : ne pas la plier à angle vif.
 2. **Interrupteurs du HAT** : `Display Config` sur **B**, `Interface Config` sur
-   **0** (positions d'usine normalement vérifier).
+   **0** (positions d'usine normalement, mais mieux vaut vérifier).
 3. **HAT → Pi** : enficher le HAT sur les 40 broches GPIO, bien aligné et à fond.
 4. Rebrancher l'alimentation.
 
@@ -285,7 +286,7 @@ sudo cp ~/zephyr/deploy/zephyr-preview.service /etc/systemd/system/
 sudo systemctl daemon-reload && sudo systemctl enable --now zephyr-preview.service
 ```
 
-puis ouvrir `http://zephyr.local:8000/preview.html` miroir exact de la dalle,
+puis ouvrir `http://zephyr.local:8000/preview.html` : miroir exact de la dalle,
 rechargé automatiquement (serveur de fichiers statique du module standard Python,
 visible du LAN uniquement).
 
@@ -298,11 +299,11 @@ dans `zephyr.service`.
 
 - **Cartouche « ! DONNÉES DE HH:MM »** : au moins une source est servie depuis le
   cache (ou la mesure Netatmo a plus d'une heure). Regarder `journalctl -u
-  zephyr.service` la cause (timeout, 401, modèle indisponible) y est logguée.
+  zephyr.service` : la cause (timeout, 401, modèle indisponible) y est logguée.
 - **`invalid_grant` au refresh Netatmo** : voir l'encadré rotation ci-dessus.
 - **Erreur GPIO/SPI à l'affichage** : vérifier que le SPI est activé
   (`ls /dev/spidev*`) et que le HAT est bien enfiché. Sur Bookworm, si la lib
   Waveshare se plaint de GPIO : `.venv/bin/pip install gpiozero lgpio`.
 - **Police manquante** (`RuntimeError: Aucune police trouvée`) : installer
-  `fonts-dejavu-core` — Raspberry Pi OS **Lite** ne l'embarque pas, contrairement
+  `fonts-dejavu-core` : Raspberry Pi OS **Lite** ne l'embarque pas, contrairement
   à la version bureau. Sur un poste Windows, Segoe UI/Arial sont utilisées.
