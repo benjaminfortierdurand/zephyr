@@ -178,9 +178,9 @@ Le miroir est alors sur `http://zephyr.local:8000/preview.html`.
 - **AROME HD ne fournit pas `cloud_cover`** (l'API renvoie `null` partout), d'où
   l'absence de bandeau de couverture nuageuse. L'ensoleillement se lit sur les
   pictogrammes de la rangée 7 jours.
-- **Les min/max du jour viennent d'AROME**, pas d'ECMWF : à 24 h d'échéance l'écart
-  atteint 3 °C, et c'est la source de la courbe juste au-dessus. Les six autres jours
-  restent à ECMWF, seul modèle à porter aussi loin.
+- **Les min/max des deux premiers jours viennent d'AROME**, pas d'ECMWF : à cette
+  échéance l'écart atteint 3 °C, et c'est la source de la courbe juste au-dessus. Les
+  jours suivants restent à ECMWF, seul modèle à porter aussi loin.
 - **La carte régionale n'est demandée que si de la pluie est attendue sous 3 heures.**
   Elle coûte 312 points en une requête ; à chaque cycle de la journée, on sortirait des
   quotas gratuits. Les repères urbains sont dans `CITIES` (`render/common.py`),
