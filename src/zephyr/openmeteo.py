@@ -20,6 +20,13 @@ MODEL_DAILY = "ecmwf_ifs025"
 FALLBACK = "best_match"
 
 HOURLY_VARS = "temperature_2m,precipitation,wind_gusts_10m"
+# Min/max du jour demandés à AROME en même temps que l'horaire : à 24 h
+# d'échéance il est nettement plus fiable qu'ECMWF sur la France (jusqu'à 3 °C
+# d'écart en épisode caniculaire). Open-Meteo agrège la journée civile entière,
+# même quand la fenêtre horaire commence en cours de journée — donc le maximum
+# reste juste le soir, une fois le pic passé. AROME ne fournit en revanche pas
+# de code météo : le pictogramme du jour reste celui d'ECMWF.
+AROME_DAILY_VARS = "temperature_2m_min,temperature_2m_max"
 
 # Carte régionale : 24 × 13 cellules de 5 km, soit 120 × 65 km autour du domicile.
 # Les proportions sont calées sur la zone d'affichage pour des cellules carrées.
@@ -39,10 +46,12 @@ def fetch_hourly(cfg: Config, model: str = MODEL_HOURLY) -> dict:
     try:
         data = _get(dict(latitude=cfg.lat, longitude=cfg.lon, models=model,
                          hourly=HOURLY_VARS, forecast_hours=24,
+                         daily=AROME_DAILY_VARS,
                          minutely_15="precipitation", forecast_minutely_15=8,
                          timezone="Europe/Paris"))
         _check(data, "hourly", "temperature_2m", minimum=12)
         _warn_absent(data, "hourly", HOURLY_VARS)
+        _warn_absent(data, "daily", AROME_DAILY_VARS)
         return data
     except (requests.RequestException, ValueError) as e:
         if model == FALLBACK:
@@ -169,6 +178,26 @@ def payload_to_rain_alert(data: dict, now: datetime) -> RainAlert | None:
         if at - now > timedelta(minutes=75):    # trop loin pour être « imminent »
             return None
         return RainAlert(at=at, ongoing=at <= now)
+    return None
+
+
+def payload_to_today_extremes(data: dict, day: date) -> tuple[float, float] | None:
+    """Min/max AROME du jour demandé, ou None s'ils ne sont pas disponibles.
+
+    La date est vérifiée explicitement : un payload servi depuis le cache peut
+    dater de la veille, auquel cas on préfère laisser ECMWF que d'afficher les
+    extrêmes d'hier.
+    """
+    block = data.get("daily") or {}
+    mins = block.get("temperature_2m_min") or []
+    maxs = block.get("temperature_2m_max") or []
+    for i, t in enumerate(block.get("time") or []):
+        if date.fromisoformat(t) != day:
+            continue
+        if i < len(mins) and i < len(maxs) \
+                and mins[i] is not None and maxs[i] is not None:
+            return float(mins[i]), float(maxs[i])
+        return None
     return None
 
 

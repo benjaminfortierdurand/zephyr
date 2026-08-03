@@ -13,7 +13,19 @@ fait 800×480 en noir et blanc pur : c'est exactement ce que l'écran affiche.*
 |---|---|---|
 | Bandeau haut | Température extérieure en très grand + écart aux normales de saison, humidité + température d'hier à la même heure, pièces intérieures (température, humidité, CO₂ 2 max), date, heure de mise à jour, lever/coucher du soleil | Netatmo (mesures + historique `getmeasure`) + normales ERA5 1991-2020 |
 | Zone centrale | Graphique 24 h : courbe de température, barres de pluie, rafales de l'heure en cours (et pointe à venir si elle est nettement plus forte) ; cartouches « pluie vers HH:MM » (pas de 15 min) et conseil d'aération (thermique par temps chaud, CO₂ le soir, calculé depuis les capteurs Netatmo). Quand une averse approche, une **carte régionale** des précipitations occupe la droite de la zone | Open-Meteo, modèle AROME HD (`meteofrance_arome_france_hd`) |
-| Bandeau bas | 7 jours : picto WMO, min/max, cumul de pluie | Open-Meteo, modèle ECMWF (`ecmwf_ifs025`) |
+| Bandeau bas | 7 jours : picto WMO, min/max, cumul de pluie. Les min/max **du jour même** viennent d'AROME, pour rester cohérents avec la courbe juste au-dessus | Open-Meteo, ECMWF (`ecmwf_ifs025`) + AROME HD pour aujourd'hui |
+
+**Deux modèles, une case partagée.** La colonne « auj. » prend ses min/max
+d'AROME HD et non d'ECMWF : à 24 h d'échéance le modèle fin est nettement plus
+juste sur la France (près de 3 °C d'écart sur le maximum lors d'un épisode
+caniculaire), et surtout c'est la même source que la courbe juste au-dessus.
+Sans quoi le graphique annonce 38° pendant que la rangée du bas affiche 35°.
+Les jours suivants restent à ECMWF, seul modèle à porter jusqu'à 7 jours. Le
+pictogramme du jour reste lui aussi ECMWF : AROME ne fournit pas de code météo.
+Aucune requête supplémentaire n'est nécessaire : le bloc journalier voyage avec
+la requête horaire existante, et Open-Meteo agrège la journée civile complète
+même quand la fenêtre commence en cours de journée (le maximum reste donc juste
+le soir).
 
 **Carte régionale.** Open-Meteo accepte une liste de coordonnées dans une seule
 requête : 312 points AROME espacés de 5 km (120 × 65 km autour du domicile)

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from datetime import datetime, timedelta
 
 from .cache import SourceCache
@@ -12,7 +13,8 @@ from .netatmo import (NetatmoClient, payload_to_current, payload_to_indoor,
 from .normals import get_normals, normals_delta
 from .openmeteo import (fetch_daily, fetch_hourly, fetch_precip_grid,
                         payload_to_daily, payload_to_hourly,
-                        payload_to_rain_alert, payload_to_sun)
+                        payload_to_rain_alert, payload_to_sun,
+                        payload_to_today_extremes)
 
 log = logging.getLogger(__name__)
 
@@ -66,6 +68,16 @@ def collect(cfg: Config) -> Snapshot:
     yesterday_temp = netatmo.fetch_yesterday_temp(cur_r.payload, now)
     rain_soon = payload_to_rain_alert(hr_r.payload, now)
     grid = fetch_precip_grid(cfg) if rain_expected(hourly, rain_soon) else None
+
+    # La colonne « auj. » prend ses min/max d'AROME plutôt que d'ECMWF : à
+    # 24 h d'échéance le modèle fin est bien plus juste, et c'est la même
+    # source que la courbe juste au-dessus — plus de 38° sur le graphique
+    # face à 35° dans la rangée du bas. Les jours suivants restent ECMWF,
+    # seul modèle à porter aussi loin.
+    if daily:
+        extremes = payload_to_today_extremes(hr_r.payload, daily[0].day)
+        if extremes:
+            daily[0] = replace(daily[0], tmin=extremes[0], tmax=extremes[1])
 
     # cache horaire ancien : ne pas afficher des heures déjà passées
     future = [p for p in hourly if p.time >= now - timedelta(minutes=45)]
