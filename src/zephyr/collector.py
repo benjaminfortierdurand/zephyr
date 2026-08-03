@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import replace
 from datetime import datetime, timedelta
 
 from .cache import SourceCache
@@ -13,8 +12,7 @@ from .netatmo import (NetatmoClient, payload_to_current, payload_to_indoor,
 from .normals import get_normals, normals_delta
 from .openmeteo import (fetch_daily, fetch_hourly, fetch_precip_grid,
                         payload_to_daily, payload_to_hourly,
-                        payload_to_daily_extremes, payload_to_rain_alert,
-                        payload_to_sun)
+                        payload_to_rain_alert, payload_to_sun)
 
 log = logging.getLogger(__name__)
 
@@ -68,16 +66,6 @@ def collect(cfg: Config) -> Snapshot:
     yesterday_temp = netatmo.fetch_yesterday_temp(cur_r.payload, now)
     rain_soon = payload_to_rain_alert(hr_r.payload, now)
     grid = fetch_precip_grid(cfg) if rain_expected(hourly, rain_soon) else None
-
-    # Les deux premiers jours prennent leurs min/max d'AROME plutôt que
-    # d'ECMWF : à cette échéance le modèle fin est bien plus juste, et c'est la
-    # même source que la courbe juste au-dessus. Sans ça le graphique annonçait
-    # 25° de minimum pour demain quand la colonne en affichait 22. Au-delà de
-    # deux jours AROME ne fournit plus rien et ECMWF garde la main.
-    arome = payload_to_daily_extremes(hr_r.payload)
-    daily = [replace(j, tmin=arome[j.day][0], tmax=arome[j.day][1])
-             if j.day in arome else j
-             for j in daily]
 
     # cache horaire ancien : ne pas afficher des heures déjà passées
     future = [p for p in hourly if p.time >= now - timedelta(minutes=45)]

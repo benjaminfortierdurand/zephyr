@@ -13,7 +13,8 @@ Il combine trois sources :
 - les mesures de la station **Netatmo** (extérieur et pièces intérieures) ;
 - les prévisions **AROME HD** de Météo-France pour les 24 heures qui viennent ;
 - les prévisions **ECMWF** pour les 7 jours, via [Open-Meteo](https://open-meteo.com)
-  dans les deux cas.
+  dans les deux cas. Les deux premiers jours de la rangée viennent d'AROME, qui
+  porte jusque-là.
 
 Quand une averse approche, une carte régionale des précipitations remplace la moitié
 droite du graphique, puis disparaît une fois l'épisode passé.
@@ -178,9 +179,12 @@ Le miroir est alors sur `http://zephyr.local:8000/preview.html`.
 - **AROME HD ne fournit pas `cloud_cover`** (l'API renvoie `null` partout), d'où
   l'absence de bandeau de couverture nuageuse. L'ensoleillement se lit sur les
   pictogrammes de la rangée 7 jours.
-- **Les min/max des deux premiers jours viennent d'AROME**, pas d'ECMWF : à cette
-  échéance l'écart atteint 3 °C, et c'est la source de la courbe juste au-dessus. Les
-  jours suivants restent à ECMWF, seul modèle à porter aussi loin.
+- **Les deux premiers jours de la rangée viennent d'AROME**, pas d'ECMWF, qui à cette
+  échéance se trompait de 3 °C sur les températures et annonçait 4 mm de pluie un jour
+  où aucun autre modèle n'en voyait. Chaque journée est prise chez un seul modèle,
+  jamais variable par variable, sinon on affiche un pictogramme d'averses au-dessus
+  d'un cumul nul. Les deux modèles voyagent dans la même requête, Open-Meteo suffixant
+  alors chaque variable du nom du modèle.
 - **La carte régionale n'est demandée que si de la pluie est attendue sous 3 heures.**
   Elle coûte 312 points en une requête ; à chaque cycle de la journée, on sortirait des
   quotas gratuits. Les repères urbains sont dans `CITIES` (`render/common.py`),
