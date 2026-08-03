@@ -17,16 +17,13 @@ API = "https://api.open-meteo.com/v1/forecast"
 TIMEOUT = 20
 MODEL_HOURLY = "meteofrance_arome_france_hd"
 MODEL_DAILY = "ecmwf_ifs025"
+# AROME standard (et non HD) pour les deux premiers jours de la rangée : c'est le
+# seul de la famille à fournir un code météo, indispensable au pictogramme. Ses
+# températures ne s'écartent de la version HD que d'un dixième de degré.
+MODEL_DAILY_FINE = "meteofrance_arome_france"
 FALLBACK = "best_match"
 
 HOURLY_VARS = "temperature_2m,precipitation,wind_gusts_10m"
-# Min/max du jour demandés à AROME en même temps que l'horaire : à 24 h
-# d'échéance il est nettement plus fiable qu'ECMWF sur la France (jusqu'à 3 °C
-# d'écart en épisode caniculaire). Open-Meteo agrège la journée civile entière,
-# même quand la fenêtre horaire commence en cours de journée — donc le maximum
-# reste juste le soir, une fois le pic passé. AROME ne fournit en revanche pas
-# de code météo : le pictogramme du jour reste celui d'ECMWF.
-AROME_DAILY_VARS = "temperature_2m_min,temperature_2m_max"
 
 # Carte régionale : 24 × 13 cellules de 5 km, soit 120 × 65 km autour du domicile.
 # Les proportions sont calées sur la zone d'affichage pour des cellules carrées.
@@ -46,12 +43,10 @@ def fetch_hourly(cfg: Config, model: str = MODEL_HOURLY) -> dict:
     try:
         data = _get(dict(latitude=cfg.lat, longitude=cfg.lon, models=model,
                          hourly=HOURLY_VARS, forecast_hours=24,
-                         daily=AROME_DAILY_VARS,
                          minutely_15="precipitation", forecast_minutely_15=8,
                          timezone="Europe/Paris"))
         _check(data, "hourly", "temperature_2m", minimum=12)
         _warn_absent(data, "hourly", HOURLY_VARS)
-        _warn_absent(data, "daily", AROME_DAILY_VARS)
         return data
     except (requests.RequestException, ValueError) as e:
         if model == FALLBACK:
@@ -61,18 +56,38 @@ def fetch_hourly(cfg: Config, model: str = MODEL_HOURLY) -> dict:
 
 
 def fetch_daily(cfg: Config, model: str = MODEL_DAILY) -> dict:
+    """Rangée des 7 jours, en interrogeant deux modèles d'un coup.
+
+    Open-Meteo accepte une liste de modèles et suffixe alors chaque variable de
+    son nom. On y gagne les deux premiers jours vus par AROME, sans requête
+    supplémentaire ; au-delà il ne renvoie rien et ECMWF garde la main.
+    """
+    models = model if model == FALLBACK else f"{model},{MODEL_DAILY_FINE}"
     try:
-        data = _get(dict(latitude=cfg.lat, longitude=cfg.lon, models=model,
+        data = _get(dict(latitude=cfg.lat, longitude=cfg.lon, models=models,
                          daily=DAILY_VARS, forecast_days=7,
                          timezone="Europe/Paris"))
-        _check(data, "daily", "temperature_2m_max", minimum=5)
-        _warn_absent(data, "daily", DAILY_VARS)
+        if len(_daily_series(data, "temperature_2m_max", model)) < 5:
+            raise ValueError("réponse daily vide ou incomplète")
         return data
     except (requests.RequestException, ValueError) as e:
         if model == FALLBACK:
             raise
         log.warning("modèle %s indisponible (%s) — fallback %s", model, e, FALLBACK)
         return fetch_daily(cfg, model=FALLBACK)
+
+
+def _daily_series(data: dict, var: str, model: str) -> list:
+    """Une variable du bloc daily, que la réponse soit suffixée ou non.
+
+    Open-Meteo ne suffixe les noms que lorsque plusieurs modèles sont demandés :
+    le repli sur un modèle unique renvoie des clés nues.
+    """
+    block = data.get("daily") or {}
+    series = block.get(f"{var}_{model}")
+    if series is None:
+        series = block.get(var)
+    return series or []
 
 
 def _check(data: dict, section: str, key: str, minimum: int) -> None:
@@ -157,10 +172,8 @@ def fetch_precip_grid(cfg: Config) -> PrecipGrid | None:
 
 def payload_to_sun(data: dict) -> tuple[datetime | None, datetime | None]:
     """Lever/coucher du soleil du jour (absents des caches antérieurs à l'ajout)."""
-    daily = data.get("daily") or {}
-
     def first(key: str) -> datetime | None:
-        values = daily.get(key) or []
+        values = _daily_series(data, key, MODEL_DAILY)
         return datetime.fromisoformat(values[0]) if values else None
 
     return first("sunrise"), first("sunset")
@@ -181,38 +194,38 @@ def payload_to_rain_alert(data: dict, now: datetime) -> RainAlert | None:
     return None
 
 
-def payload_to_daily_extremes(data: dict) -> dict[date, tuple[float, float]]:
-    """Min/max AROME par date, pour les jours où le modèle les fournit.
-
-    AROME porte à deux jours ; au-delà les valeurs sont nulles et absentes du
-    résultat. Les dates sont reprises telles quelles du payload, ce qui suffit
-    à écarter un cache de la veille : sa date ne correspondra à aucun des jours
-    affichés, et ECMWF gardera la main.
-    """
-    block = data.get("daily") or {}
-    mins = block.get("temperature_2m_min") or []
-    maxs = block.get("temperature_2m_max") or []
-    out: dict[date, tuple[float, float]] = {}
-    for i, t in enumerate(block.get("time") or []):
-        if i < len(mins) and i < len(maxs) \
-                and mins[i] is not None and maxs[i] is not None:
-            out[date.fromisoformat(t)] = (float(mins[i]), float(maxs[i]))
-    return out
-
-
 def payload_to_daily(data: dict) -> list[DailyPoint]:
-    dl = data["daily"]
+    """Rangée des 7 jours, chaque journée prise chez un seul modèle.
+
+    AROME l'emporte tant qu'il fournit ses quatre variables, soit les deux
+    premiers jours ; ECMWF prend la suite. Le choix se fait par journée entière
+    et jamais variable par variable : mélanger les sources afficherait un
+    pictogramme d'averses au-dessus d'un cumul nul, ce qui s'est produit tant
+    que seules les températures étaient reprises.
+    """
+    times = _daily_series(data, "time", MODEL_DAILY)
+    VARS = ("temperature_2m_min", "temperature_2m_max",
+            "precipitation_sum", "weather_code")
+    coarse = {v: _daily_series(data, v, MODEL_DAILY) for v in VARS}
+    fine = {v: (data.get("daily") or {}).get(f"{v}_{MODEL_DAILY_FINE}") or []
+            for v in VARS}
+
     days = []
-    for t, tmin, tmax, mm, wmo in zip(dl["time"], dl["temperature_2m_min"],
-                                      dl["temperature_2m_max"], dl["precipitation_sum"],
-                                      dl["weather_code"]):
+    for i, t in enumerate(times):
+        src = fine if all(i < len(fine[v]) and fine[v][i] is not None
+                          for v in VARS) else coarse
+        if i >= len(src["temperature_2m_min"]) or i >= len(src["temperature_2m_max"]):
+            continue
+        tmin, tmax = src["temperature_2m_min"][i], src["temperature_2m_max"][i]
         if tmin is None or tmax is None:
             continue
+        mm = src["precipitation_sum"][i] if i < len(src["precipitation_sum"]) else None
+        wmo = src["weather_code"][i] if i < len(src["weather_code"]) else None
         days.append(DailyPoint(
             day=date.fromisoformat(t),
             tmin=float(tmin),
             tmax=float(tmax),
-            precip_mm=float(mm or 0.0),
+            precip_mm=float(mm) if mm is not None else 0.0,
             wmo=int(wmo) if wmo is not None else 3,
         ))
     return days
