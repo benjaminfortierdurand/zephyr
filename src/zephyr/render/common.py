@@ -481,9 +481,15 @@ def draw_day_cell(d: ImageDraw.ImageDraw, box, day: DailyPoint, today: date, *,
 # ---------------------------------------------------------------- badge péremption
 
 def draw_stale_badge(d: ImageDraw.ImageDraw, x_right: int, y: int,
-                     since: datetime | None, inverse: bool = False) -> None:
-    """Cartouche « données périmées ». inverse=True pour un bandeau noir."""
-    txt = "! DONNÉES DE " + (f"{since:%H:%M}" if since else "?")
+                     since: datetime | None, inverse: bool = False,
+                     source: str | None = None) -> None:
+    """Cartouche « données périmées ». inverse=True pour un bandeau noir.
+
+    La source est nommée quand une seule est en cause : « ! NETATMO 18:07 » dit
+    tout de suite que les prévisions, elles, sont à jour.
+    """
+    quand = f"{since:%H:%M}" if since else "?"
+    txt = f"! {source} {quand}" if source else f"! DONNÉES DE {quand}"
     f = font(13, bold=True)
     w = text_w(d, txt, f) + 18
     bg, fg = (WHITE, BLACK) if inverse else (BLACK, WHITE)

@@ -36,7 +36,8 @@ def render(snap: Snapshot) -> Image.Image:
     d.text((WIDTH - 18, 44), f"mis à jour à {now:%H:%M}", font=font(14, bold=True),
            fill=WHITE, anchor="ra")
     if snap.stale:
-        draw_stale_badge(d, WIDTH - 18, 66, snap.stale_since, inverse=True)
+        draw_stale_badge(d, WIDTH - 18, 66, snap.stale_since, inverse=True,
+                         source=snap.stale_source)
 
     # --- graphique 24 h ---------------------------------------------------
     d.text((20, 106), "PROCHAINES 24 H", font=font(15, bold=True), fill=BLACK)
