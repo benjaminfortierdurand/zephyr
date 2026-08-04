@@ -16,7 +16,13 @@ from .openmeteo import (fetch_daily, fetch_hourly, fetch_precip_grid,
 
 log = logging.getLogger(__name__)
 
-NETATMO_MAX_AGE = timedelta(hours=1)  # au-delà, la mesure est considérée périmée
+# Le cartouche se juge sur l'âge de la donnée affichée, jamais sur l'échec d'un
+# appel. Netatmo renvoie des 503 par intermittence : un cycle raté alors que le
+# cache date de dix minutes n'a rien de périmé, la station elle-même ne publie
+# qu'une mesure par dizaine de minutes. Signaler chaque hoquet ferait clignoter
+# l'avertissement et lui ferait perdre tout son sens.
+NETATMO_MAX_AGE = timedelta(hours=1)     # âge de la mesure, fraîche ou mise en cache
+FORECAST_MAX_AGE = timedelta(hours=2)    # âge du dernier payload Open-Meteo obtenu
 
 
 def aeration_advice(current: CurrentConditions, indoor: list[IndoorConditions],
@@ -76,14 +82,13 @@ def collect(cfg: Config) -> Snapshot:
     # que les prévisions sont fraîches change ce qu'on lit sur l'écran. Les deux
     # appels Open-Meteo comptent pour une seule source aux yeux du lecteur.
     perimees: list[tuple[str, datetime]] = []
-    if cur_r.stale:
-        perimees.append(("NETATMO", cur_r.fetched_at))
-    elif now - current.measured_at > NETATMO_MAX_AGE:
-        # station en ligne mais mesure trop vieille (module HS, pile vide…)
+    if now - current.measured_at > NETATMO_MAX_AGE:
+        # vaut pour l'API muette comme pour le module qui s'est tu (pile, radio)
         log.warning("mesure Netatmo datée de %s, marquée périmée", current.measured_at)
         perimees.append(("NETATMO", current.measured_at))
     for r in (hr_r, dy_r):
-        if r.stale:
+        if now - r.fetched_at > FORECAST_MAX_AGE:
+            log.warning("prévisions datées de %s, marquées périmées", r.fetched_at)
             perimees.append(("PRÉVISIONS", r.fetched_at))
 
     noms = {nom for nom, _ in perimees}
