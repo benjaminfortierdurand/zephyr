@@ -39,19 +39,23 @@ class HourlyPoint:
 
 @dataclass
 class PrecipGrid:
-    """Champ de précipitations AROME autour du domicile, en cellules carrées.
+    """Champ de précipitations observé autour du domicile, en cellules carrées.
 
     `values` est rangé par lignes du nord vers le sud, chaque ligne d'ouest en est
-    (donc dans l'ordre de lecture de l'écran). Unité : mm sur 15 minutes.
+    (donc dans l'ordre de lecture de l'écran). Chaque valeur est une intensité
+    de 0 (rien) à 3 (forte), et non une hauteur d'eau : le radar mesure une
+    réflectivité, la convertir en millimètres ajouterait une approximation sans
+    rien apporter à un écran en noir et blanc.
     """
     cols: int
     rows: int
     km: float                  # côté d'une cellule
-    values: list[float]        # champ actuel
+    values: list[float]        # intensité observée, de 0 à 3
     lat: float = 0.0           # centre de la carte (pour projeter les repères)
     lon: float = 0.0
-    ahead: list[float] | None = None   # même champ une heure plus tard
-    ahead_minutes: int = 60
+    contour: list[float] | None = None   # même champ à un autre instant
+    contour_label: str = ""              # ce que ce contour représente
+    observed_at: datetime | None = None  # heure de l'image radar
 
 
 @dataclass

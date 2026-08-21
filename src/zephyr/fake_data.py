@@ -5,7 +5,7 @@ import math
 from datetime import datetime, timedelta
 
 from .models import (CurrentConditions, DailyPoint, HourlyPoint, IndoorConditions,
-                     RainAlert, Snapshot)
+                     PrecipGrid, RainAlert, Snapshot)
 
 # Rafales (km/h) heure par heure : une averse orageuse passe environ 4-6 h après
 # le début de la fenêtre, puis le vent retombe.
@@ -23,6 +23,28 @@ _DAILY = [
     (17.5, 31.2, 0.0, 2),    # variable
     (18.1, 27.4, 0.3, 1),    # peu nuageux
 ]
+
+
+def _champ_radar(now: datetime) -> PrecipGrid:
+    """Ligne de grains arrivant du sud-ouest, telle que le radar la verrait."""
+    from .radar import GRID_COLS, GRID_KM, GRID_ROWS
+
+    def champ(decalage: float) -> list[float]:
+        vals = []
+        for r in range(GRID_ROWS):
+            for c in range(GRID_COLS):
+                dx = (c - GRID_COLS / 2) / 1.7 - decalage
+                dy = (r - GRID_ROWS / 2) / 1.7 + decalage * 0.75
+                bande = (dx * 0.80 + dy * 0.60) + 5.2
+                noyau = math.exp(-((dx + 6) ** 2 / 18 + (dy - 2.5) ** 2 / 9))
+                v = math.exp(-(bande ** 2) / 4.0) * 2.2 + noyau * 2.4
+                vals.append(float(min(3, round(v))))
+        return vals
+
+    return PrecipGrid(cols=GRID_COLS, rows=GRID_ROWS, km=GRID_KM,
+                      values=champ(0.0), lat=48.8566, lon=2.3522,
+                      contour=champ(3.5), contour_label="contour : il y a 30 min",
+                      observed_at=now - timedelta(minutes=4))
 
 
 def make_snapshot(stale: bool = False) -> Snapshot:
@@ -73,6 +95,7 @@ def make_snapshot(stale: bool = False) -> Snapshot:
         stale=stale,
         stale_since=(now - timedelta(minutes=47)) if stale else None,
         indoor=indoor,
+        precip_grid=_champ_radar(now),
         rain_soon=RainAlert(at=now + timedelta(minutes=35), ongoing=False),
         normals_delta=6.4,
         advice="plus frais dehors : aérez",

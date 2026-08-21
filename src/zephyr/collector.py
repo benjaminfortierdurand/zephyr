@@ -6,13 +6,13 @@ from datetime import datetime, timedelta
 
 from .cache import SourceCache
 from .config import Config
-from .models import CurrentConditions, IndoorConditions, Snapshot
+from .models import CurrentConditions, IndoorConditions, RainAlert, Snapshot
 from .netatmo import (NetatmoClient, payload_to_current, payload_to_indoor,
                       select_indoor)
 from .normals import get_normals, normals_delta
-from .openmeteo import (fetch_daily, fetch_hourly, fetch_precip_grid,
-                        payload_to_daily, payload_to_hourly,
-                        payload_to_rain_alert, payload_to_sun)
+from .openmeteo import (fetch_daily, fetch_hourly, payload_to_daily,
+                        payload_to_hourly, payload_to_rain_alert, payload_to_sun)
+from .radar import fetch_radar, rain_here
 
 log = logging.getLogger(__name__)
 
@@ -42,18 +42,6 @@ def aeration_advice(current: CurrentConditions, indoor: list[IndoorConditions],
     return None
 
 
-def rain_expected(hourly: list, rain_soon) -> bool:
-    """La carte régionale ne vaut d'être demandée que si de la pluie approche.
-
-    C'est ce qui garde le projet dans les quotas gratuits d'Open-Meteo : une
-    grille de 312 points à chaque cycle de la journée les dépasserait, alors
-    qu'une grille aux seules heures pluvieuses en reste très loin.
-    """
-    if rain_soon is not None:
-        return True
-    return any(p.precip is not None and p.precip > 0 for p in hourly[:3])
-
-
 def collect(cfg: Config) -> Snapshot:
     cache = SourceCache(cfg.data_dir)
     netatmo = NetatmoClient(cfg)
@@ -71,7 +59,15 @@ def collect(cfg: Config) -> Snapshot:
     sunrise, sunset = payload_to_sun(dy_r.payload)
     yesterday_temp = netatmo.fetch_yesterday_temp(cur_r.payload, now)
     rain_soon = payload_to_rain_alert(hr_r.payload, now)
-    grid = fetch_precip_grid(cfg) if rain_expected(hourly, rain_soon) else None
+    # Le radar décide lui-même s'il y a quelque chose à montrer : il rend None
+    # quand aucun écho n'apparaît dans la zone. Plus besoin d'interroger la
+    # prévision pour savoir s'il pleut, ce qui était précisément le maillon
+    # faible : une averse convective ne figure dans aucun modèle.
+    grid = fetch_radar(cfg)
+    # Le radar a le dernier mot sur la pluie en cours : il a vu tomber des
+    # averses qu'AROME n'annonçait pas du tout.
+    if grid is not None and rain_here(grid):
+        rain_soon = RainAlert(at=now, ongoing=True)
 
     # cache horaire ancien : ne pas afficher des heures déjà passées
     future = [p for p in hourly if p.time >= now - timedelta(minutes=45)]

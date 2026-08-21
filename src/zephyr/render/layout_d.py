@@ -80,7 +80,7 @@ def render(snap: Snapshot) -> Image.Image:
     chart_right = WIDTH - MARGIN
     if snap.precip_grid:
         chart_right = WIDTH - MARGIN - MAP_W - 20
-        d.text((WIDTH - MARGIN - MAP_W, 146), "PLUIE EN RÉGION",
+        d.text((WIDTH - MARGIN - MAP_W, 146), "PLUIE OBSERVÉE",
                font=f_title, fill=BLACK)
 
     pills = []

@@ -329,31 +329,34 @@ def draw_precip_map(d: ImageDraw.ImageDraw, box, grid: PrecipGrid,
         row, col = divmod(i, grid.cols)
         ax0, ay0 = round(x0 + col * cw), round(y0 + row * ch)
         ax1, ay1 = round(x0 + (col + 1) * cw), round(y0 + (row + 1) * ch)
-        if v >= 1.0:                                   # forte
+        if v >= 3:                                     # forte
             d.rectangle((ax0, ay0, ax1, ay1), fill=BLACK)
-        elif v >= 0.3:                                 # modérée
+        elif v >= 2:                                   # modérée
             for x in range(ax0, ax1):
                 for y in range(ay0, ay1):
                     if (x + y) % 3 == 0:
                         d.point((x, y), fill=BLACK)
-        elif v >= 0.05:                                # faible
+        elif v >= 1:                                   # faible
             for x in range(ax0, ax1):
                 for y in range(ay0, ay1):
-                    if x % 4 == 0 and y % 4 == 0:
+                    if x % 3 == 0 and y % 3 == 0:
                         d.point((x, y), fill=BLACK)
 
-    # position prévue dans une heure, en contour : le trait suit les bords des
-    # cellules pluvieuses de l'échéance, ce qui montre à la fois vers où la masse
-    # se déplace et si elle grossit ou se délite
-    if grid.ahead:
-        seuil = 0.15
+    # position à un autre instant, en contour : le trait suit les bords des
+    # cellules pluvieuses, ce qui montre vers où la masse se déplace et si elle
+    # grossit ou se délite
+    if grid.contour:
+        # seuls les cœurs intenses sont détourés : à ce seuil le trait suit une
+        # ou deux masses dont le déplacement se lit, alors qu'en détourant aussi
+        # les pluies modérées il se réduit à de la dentelle
+        seuil = 3
 
         def pluvieux(row: int, col: int) -> bool:
             if not (0 <= row < grid.rows and 0 <= col < grid.cols):
                 return False
-            return grid.ahead[row * grid.cols + col] >= seuil
+            return grid.contour[row * grid.cols + col] >= seuil
 
-        for i, v in enumerate(grid.ahead):
+        for i, v in enumerate(grid.contour):
             if v < seuil:
                 continue
             row, col = divmod(i, grid.cols)
@@ -372,11 +375,16 @@ def draw_precip_map(d: ImageDraw.ImageDraw, box, grid: PrecipGrid,
     # y tomberait est omis plutôt que recouvert à moitié
     f_n, f_km = font(12, bold=True), font(11)
     scale_lab = f"{round(grid.cols * grid.km)} km"
-    note = f"contour : dans {grid.ahead_minutes} min" if grid.ahead else None
+    note = grid.contour_label if grid.contour else None
+    # l'heure de l'image : une carte radar sans date ne dit pas si elle vaut
+    # encore quelque chose
+    heure = f"radar {grid.observed_at:%H:%M}" if grid.observed_at else None
     reserved = [(x0, y0, x0 + 16, y0 + 18),
                 (x1 - text_w(d, scale_lab, f_km) - 8, y1 - 16, x1, y1)]
     if note:
         reserved.append((x0, y1 - 16, x0 + text_w(d, note, f_km) + 8, y1))
+    if heure:
+        reserved.append((x1 - text_w(d, heure, f_km) - 8, y0, x1, y0 + 16))
 
     # repères urbains : point cerclé de blanc + nom sur fond blanc, sinon rien
     # ne ressort d'une zone de pluie dense
@@ -416,6 +424,10 @@ def draw_precip_map(d: ImageDraw.ImageDraw, box, grid: PrecipGrid,
         d.rectangle((x0 + 1, y1 - 15, x0 + text_w(d, note, f_km) + 7, y1 - 1),
                     fill=WHITE)
         d.text((x0 + 4, y1 - 3), note, font=f_km, fill=BLACK, anchor="ls")
+    if heure:
+        d.rectangle((x1 - text_w(d, heure, f_km) - 7, y0 + 1, x1 - 1, y0 + 15),
+                    fill=WHITE)
+        d.text((x1 - 4, y0 + 2), heure, font=f_km, fill=BLACK, anchor="ra")
 
 
 def draw_legend(d: ImageDraw.ImageDraw, x_right: int, y: int, items, fs: int = 13) -> None:

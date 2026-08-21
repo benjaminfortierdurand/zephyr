@@ -8,16 +8,17 @@ toutes les 10 minutes.
 *Rendu réel du programme, en données de démonstration (`--dev --fake`). 800×480 en
 noir et blanc pur : c'est exactement ce que l'écran affiche.*
 
-Il combine trois sources :
+Il combine quatre sources :
 
 - les mesures de la station **Netatmo** (extérieur et pièces intérieures) ;
 - les prévisions **AROME HD** de Météo-France pour les 24 heures qui viennent ;
 - les prévisions **ECMWF** pour les 7 jours, via [Open-Meteo](https://open-meteo.com)
   dans les deux cas. Les deux premiers jours de la rangée viennent d'AROME, qui
-  porte jusque-là.
+  porte jusque-là ;
+- le radar de [RainViewer](https://www.rainviewer.com) pour la pluie en cours.
 
-Quand une averse approche, une carte régionale des précipitations remplace la moitié
-droite du graphique, puis disparaît une fois l'épisode passé.
+Quand il pleut dans la région, une carte radar remplace la moitié droite du
+graphique, puis disparaît une fois l'épisode passé.
 
 ## Matériel
 
@@ -188,10 +189,14 @@ Le miroir est alors sur `http://zephyr.local:8000/preview.html`.
   jamais variable par variable, sinon on affiche un pictogramme d'averses au-dessus
   d'un cumul nul. Les deux modèles voyagent dans la même requête, Open-Meteo suffixant
   alors chaque variable du nom du modèle.
-- **La carte régionale n'est demandée que si de la pluie est attendue sous 3 heures.**
-  Elle coûte 312 points en une requête ; à chaque cycle de la journée, on sortirait des
-  quotas gratuits. Les repères urbains sont dans `CITIES` (`render/common.py`),
-  à adapter à sa région.
+- **La carte montre le radar, pas une prévision.** Une averse convective naît en une
+  demi-heure et couvre cinq kilomètres : aucun modèle ne sait dire quelle commune la
+  prendra. Le 21 août 2026, AROME annonçait 0,0 mm pendant qu'une cellule intense se
+  vidait sur le domicile. La carte ne s'affiche que s'il y a un écho dans la zone, et
+  c'est aussi le radar qui décide s'il pleut ici en ce moment. En échange il n'annonce
+  rien : la position d'il y a trente minutes, tracée en contour, donne le sens du
+  déplacement. Les repères urbains sont dans `CITIES` (`render/common.py`), à adapter
+  à sa région. Données RainViewer, libres d'usage non commercial.
 - **Les normales de saison** (1991-2020) sont calculées une fois depuis l'archive ERA5,
   puis mises en cache dans `data/normals.json`.
 - **Rendu** : niveaux de gris avec Pillow puis binarisation par seuil, jamais de
