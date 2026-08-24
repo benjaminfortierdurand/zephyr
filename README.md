@@ -192,8 +192,11 @@ Le miroir est alors sur `http://zephyr.local:8000/preview.html`.
 - **La carte montre le radar, pas une prévision.** Une averse convective naît en une
   demi-heure et couvre cinq kilomètres : aucun modèle ne sait dire quelle commune la
   prendra. Le 21 août 2026, AROME annonçait 0,0 mm pendant qu'une cellule intense se
-  vidait sur le domicile. La carte ne s'affiche que s'il y a un écho dans la zone, et
-  c'est aussi le radar qui décide s'il pleut ici en ce moment. En échange il n'annonce
+  vidait sur le domicile. La carte ne s'affiche que si quelque chose
+  concerne le domicile : un écho à moins de 25 km, ou une masse organisée même
+  lointaine. Quelques cellules éparses à quarante kilomètres n'allument rien, sans
+  quoi le voyant finirait par ne plus rien vouloir dire. C'est aussi le radar qui
+  décide s'il pleut ici en ce moment. En échange il n'annonce
   rien : la position d'il y a trente minutes, tracée en contour, donne le sens du
   déplacement. Les repères urbains sont dans `CITIES` (`render/common.py`), à adapter
   à sa région. Données RainViewer, libres d'usage non commercial.
