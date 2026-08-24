@@ -33,6 +33,11 @@ TIMEOUT = 20
 CONTOUR_MIN = 30     # ancienneté de l'image tracée en contour
 SAT_MIN = 120        # en deçà, la couleur est un écho ténu et non de la pluie franche
 COUVERTURE_MIN = 0.25  # part de la cellule qu'un niveau doit couvrir pour la définir
+# Seuils d'affichage de la carte. Un écho isolé à quarante kilomètres ne concerne
+# pas le domicile : afficher la carte pour lui, c'est allumer un voyant qui ne
+# veut rien dire, et le lecteur cesse de le regarder.
+PROCHE_KM = 25       # au-delà, une averse ne nous concerne pas encore
+MASSE_MIN = 20       # cellules soutenues qu'il faut pour parler d'un front
 
 # Grille d'affichage : 40 × 22 cellules de 3 km, soit 120 × 66 km. Les mailles
 # sont plus fines que du temps d'AROME (5 km) puisque le radar le permet.
@@ -144,6 +149,25 @@ def _echantillonner(lvl: Image.Image, tx0: int, ty0: int,
     return valeurs
 
 
+def _distance_km(index: int) -> float:
+    """Distance du centre de la cellule au domicile."""
+    row, col = divmod(index, GRID_COLS)
+    return math.hypot((row + 0.5) - GRID_ROWS / 2,
+                      (col + 0.5) - GRID_COLS / 2) * GRID_KM
+
+
+def merite_affichage(valeurs: list[float]) -> bool:
+    """La carte a-t-elle quelque chose à raconter ?
+
+    Deux cas seulement : de la pluie assez proche pour arriver dans l'heure, ou
+    une masse organisée même lointaine, dont on veut voir l'approche. Quelques
+    cellules éparses à quarante kilomètres ne sont ni l'un ni l'autre.
+    """
+    if any(v >= 1 and _distance_km(i) <= PROCHE_KM for i, v in enumerate(valeurs)):
+        return True
+    return sum(1 for v in valeurs if v >= 2) >= MASSE_MIN
+
+
 def rain_here(grid: PrecipGrid) -> bool:
     """Le radar voit-il de la pluie sur le domicile même ?
 
@@ -160,8 +184,8 @@ def rain_here(grid: PrecipGrid) -> bool:
 def fetch_radar(cfg: Config) -> PrecipGrid | None:
     """Champ radar courant, avec la position d'il y a 30 min en contour.
 
-    Rend None s'il ne pleut nulle part dans la zone : la carte n'a alors rien à
-    montrer, et l'image plus ancienne n'est même pas téléchargée.
+    Rend None quand rien dans la zone ne concerne le domicile (voir
+    merite_affichage) : la carte n'a alors rien à montrer.
     """
     try:
         idx = requests.get(INDEX_URL, timeout=TIMEOUT).json()
@@ -173,7 +197,9 @@ def fetch_radar(cfg: Config) -> PrecipGrid | None:
         recente = passees[-1]
         mos, tx0, ty0 = _mosaique(host, recente["path"], cfg)
         valeurs = _echantillonner(_niveaux(mos), tx0, ty0, cfg)
-        if not any(valeurs):
+        if not merite_affichage(valeurs):
+            # rien qui nous concerne : on s'arrête là, sans même télécharger
+            # la mosaïque plus ancienne destinée au contour
             return None
 
         # image d'il y a une demi-heure, la plus proche de l'écart voulu
