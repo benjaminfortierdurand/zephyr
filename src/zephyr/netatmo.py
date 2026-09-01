@@ -130,6 +130,12 @@ class NetatmoClient:
             "indoor": indoor,
             "station_id": station.get("_id"),   # MACs pour getmeasure (historique)
             "outdoor_id": outdoor.get("_id"),
+            # Qualité des liaisons. Sans elles, un retard de données ne se
+            # diagnostique qu'au raisonnement : le 1er septembre 2026, il a
+            # fallu trois heures de journal pour deviner un wifi défaillant.
+            "wifi_status": station.get("wifi_status"),
+            "rf_status": outdoor.get("rf_status"),
+            "battery_percent": outdoor.get("battery_percent"),
         }
 
     # ----------------------------------------------------------- historique
@@ -163,6 +169,28 @@ class NetatmoClient:
         r.raise_for_status()
         body = r.json().get("body") or {}
         return [body[key] for key in sorted(body)]
+
+
+# Netatmo note ses signaux à l'envers : plus le nombre est grand, plus la
+# liaison est mauvaise. Seuils de sa documentation.
+_WIFI = (86, 71)   # au-delà de 86 : mauvais ; de 71 à 86 : moyen
+_RF = (90, 80)     # liaison radio base <-> module extérieur
+
+
+def _niveau(valeur, seuils: tuple[int, int]) -> str:
+    if valeur is None:
+        return "?"     # cache écrit avant l'ajout de ces champs
+    mauvais, moyen = seuils
+    etat = "mauvais" if valeur >= mauvais else "moyen" if valeur >= moyen else "bon"
+    return f"{valeur} ({etat})"
+
+
+def describe_link(payload: dict) -> str:
+    """État des liaisons, joint au journal quand une mesure est périmée."""
+    pile = payload.get("battery_percent")
+    return (f"wifi base {_niveau(payload.get('wifi_status'), _WIFI)}, "
+            f"radio module {_niveau(payload.get('rf_status'), _RF)}, "
+            f"pile module {pile if pile is not None else '?'} %")
 
 
 def select_indoor(indoor: list[dict], entries: tuple[str, ...]) -> list[dict]:

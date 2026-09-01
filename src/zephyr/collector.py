@@ -7,8 +7,8 @@ from datetime import datetime, timedelta
 from .cache import SourceCache
 from .config import Config
 from .models import CurrentConditions, IndoorConditions, RainAlert, Snapshot
-from .netatmo import (NetatmoClient, payload_to_current, payload_to_indoor,
-                      select_indoor)
+from .netatmo import (NetatmoClient, describe_link, payload_to_current,
+                      payload_to_indoor, select_indoor)
 from .normals import get_normals, normals_delta
 from .openmeteo import (fetch_daily, fetch_hourly, payload_to_daily,
                         payload_to_hourly, payload_to_rain_alert, payload_to_sun)
@@ -80,7 +80,8 @@ def collect(cfg: Config) -> Snapshot:
     perimees: list[tuple[str, datetime]] = []
     if now - current.measured_at > NETATMO_MAX_AGE:
         # vaut pour l'API muette comme pour le module qui s'est tu (pile, radio)
-        log.warning("mesure Netatmo datée de %s, marquée périmée", current.measured_at)
+        log.warning("mesure Netatmo datée de %s, marquée périmée (%s)",
+                    current.measured_at, describe_link(cur_r.payload))
         perimees.append(("NETATMO", current.measured_at))
     for r in (hr_r, dy_r):
         if now - r.fetched_at > FORECAST_MAX_AGE:

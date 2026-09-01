@@ -167,7 +167,11 @@ Le miroir est alors sur `http://zephyr.local:8000/preview.html`.
   ont plus d'une heure pour la station, plus de deux pour les prévisions. Un appel raté
   ne suffit pas à l'allumer, sans quoi il clignoterait au moindre hoquet d'API : c'est
   l'âge de la donnée affichée qui compte. La cause est dans
-  `journalctl -u zephyr.service`.
+  `journalctl -u zephyr.service`, où la ligne donne aussi l'état des liaisons
+  (wifi de la base, radio du module, pile). Un retard qui grandit régulièrement
+  alors que la série reste complète, sans trou, désigne la base qui n'arrive pas
+  à écouler ce qu'elle mesure : c'est en amont de Zephyr, et le tableau de bord
+  Netatmo affiche alors le même retard.
 - **`invalid_grant` Netatmo** : le refresh token a été invalidé. Supprimer
   `data/netatmo_token.json`, en regénérer un et le remettre dans `.env`.
 - **Erreur GPIO/SPI** : vérifier `ls /dev/spidev*` et l'enfichage du HAT. Sur Bookworm :
