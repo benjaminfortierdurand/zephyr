@@ -90,6 +90,11 @@ def collect(cfg: Config) -> Snapshot:
 
     noms = {nom for nom, _ in perimees}
     stale_dates = [quand for _, quand in perimees]
+    # Un conseil d'aération calculé sur une mesure de midi, affiché le soir,
+    # dit exactement le contraire de ce qu'il faut faire. Le 2 septembre 2026,
+    # sept heures de retard chez Netatmo faisaient recommander de fermer
+    # parce que le module marquait 31 °C au soleil de la mi-journée.
+    netatmo_ok = "NETATMO" not in noms
 
     return Snapshot(
         current=current,
@@ -104,7 +109,7 @@ def collect(cfg: Config) -> Snapshot:
         precip_grid=grid,
         normals_delta=(normals_delta(get_normals(cfg), daily[0].day, daily[0].tmax)
                        if daily else None),
-        advice=aeration_advice(current, indoor, now),
+        advice=aeration_advice(current, indoor, now) if netatmo_ok else None,
         sunrise=sunrise,
         sunset=sunset,
         yesterday_temp=yesterday_temp,
