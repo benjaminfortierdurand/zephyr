@@ -196,11 +196,15 @@ Le miroir est alors sur `http://zephyr.local:8000/preview.html`.
 - **La carte montre le radar, pas une prévision.** Une averse convective naît en une
   demi-heure et couvre cinq kilomètres : aucun modèle ne sait dire quelle commune la
   prendra. Le 21 août 2026, AROME annonçait 0,0 mm pendant qu'une cellule intense se
-  vidait sur le domicile. La carte ne s'affiche que si quelque chose
-  concerne le domicile : un écho à moins de 25 km, ou une masse organisée même
-  lointaine. Quelques cellules éparses à quarante kilomètres n'allument rien, sans
-  quoi le voyant finirait par ne plus rien vouloir dire. C'est aussi le radar qui
-  décide s'il pleut ici en ce moment. En échange il n'annonce
+  vidait sur le domicile. Comme elle prend la moitié du graphique 24 h, elle ne
+  s'affiche que pour de la pluie franche (1 mm/h et plus) couvrant une averse
+  entière à moins de 20 km, une cellule forte comptant double. La bruine, la pluie
+  faible et les fronts lointains n'allument rien : la première passe par la
+  pastille « pluie en cours », les seconds se lisent sur la courbe, où les modèles
+  les prévoient bien. Sous 15 dBZ, la bande que la palette RainViewer peint en
+  gris plutôt qu'en bleu, l'écho est ignoré. C'est aussi le radar qui décide s'il
+  pleut ici en ce moment, et le journal du service donne à chaque cycle ce qu'il a
+  vu, de quoi revoir les seuils sur pièces. En échange il n'annonce
   rien : la position d'il y a trente minutes, tracée en contour, donne le sens du
   déplacement. Les repères urbains sont dans `CITIES` (`render/common.py`), à adapter
   à sa région. Données RainViewer, libres d'usage non commercial.

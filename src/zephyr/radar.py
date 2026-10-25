@@ -31,13 +31,31 @@ ZOOM = 7             # dernier niveau servi gratuitement, environ 0,8 km par pix
 TILE = 256
 TIMEOUT = 20
 CONTOUR_MIN = 30     # ancienneté de l'image tracée en contour
-SAT_MIN = 120        # en deçà, la couleur est un écho ténu et non de la pluie franche
 COUVERTURE_MIN = 0.25  # part de la cellule qu'un niveau doit couvrir pour la définir
-# Seuils d'affichage de la carte. Un écho isolé à quarante kilomètres ne concerne
-# pas le domicile : afficher la carte pour lui, c'est allumer un voyant qui ne
-# veut rien dire, et le lecteur cesse de le regarder.
-PROCHE_KM = 25       # au-delà, une averse ne nous concerne pas encore
-MASSE_MIN = 20       # cellules soutenues qu'il faut pour parler d'un front
+
+# Paliers, vérifiés couleur par couleur contre la table officielle de la palette
+# « Universal Blue », la seule que servent les tuiles quel que soit le paramètre
+# (rainviewer.com/files/rainviewer_api_colors_table.csv). Intensités en mm/h
+# par la relation de Marshall-Palmer.
+#   sous 15 dBZ : gris et beiges, que la palette elle-même ne peint pas en
+#                 pluie (bruine qui n'atteint pas le sol, échos parasites) : 0
+#   15 à 22     : niveau 1, pluie faible, 0,3 à 0,9 mm/h
+#   23 à 34     : niveau 2, pluie franche, 1 à 5 mm/h
+#   35 et plus  : niveau 3, forte, jusqu'aux magentas et blancs de la grêle
+# La table finit au vert pur au-delà de 75 dBZ, où ne monte aucune pluie réelle.
+SAT_COULEUR = 100    # sous ce seuil, gris et beiges (au plus 87) ; bleu de 15 dBZ : 110
+SAT_VIF = 120        # bleus soutenus, jaunes, rouges
+VAL_FONCE = 200      # le bleu passe sous cette valeur à 23 dBZ
+VAL_ECLATANT = 250   # jaunes, magentas, blanc : seuls à toucher le blanc pur
+
+# Seuils d'affichage de la carte. Elle prend la moitié du graphique 24 h : elle
+# ne la mérite que pour de la pluie franche, en surface, assez près pour nous
+# atteindre dans la demi-heure. Avant octobre 2026, un seul écho à 0,01 mm/h
+# dans un rayon de 25 km suffisait, et par temps d'automne la carte ne
+# quittait plus l'écran.
+PROCHE_KM = 20       # au-delà, une averse ne nous concerne pas encore
+SURFACE_MIN = 4      # cellules de 9 km², une forte comptant double : une averse,
+                     # pas une tache ni un écho parasite fixe
 
 # Grille d'affichage : 40 × 22 cellules de 3 km, soit 120 × 66 km. Les mailles
 # sont plus fines que du temps d'AROME (5 km) puisque le radar le permet.
@@ -86,19 +104,20 @@ def _mosaique(host: str, chemin: str, cfg: Config):
 def _niveaux(mos: Image.Image) -> Image.Image:
     """Image des intensités 0 à 3, sans boucle Python sur les pixels.
 
-    RainViewer ignore le paramètre de palette et sert toujours la même rampe :
-    des gris et beiges peu saturés pour les échos les plus ténus, puis des bleus
-    du clair au foncé, puis du jaune au rouge pour les cœurs. La teinte suit donc
-    l'intensité, à condition d'écarter d'abord les couleurs ternes, qui partagent
-    leur teinte avec les oranges sans rien avoir de commun avec eux.
+    La rampe « Universal Blue » : des gris et beiges ternes pour les échos les
+    plus ténus, des bleus du clair au foncé, puis du jaune au rouge sombre, et
+    enfin des magentas pâles et du blanc pour les cœurs extrêmes. Ces derniers
+    sont peu saturés comme les gris, mais d'une clarté qu'aucun gris n'atteint.
     """
     hsv = mos.convert("RGB").convert("HSV")
     teinte, saturation, valeur = hsv.split()
     present = mos.split()[3].point(lambda v: 255 if v > 0 else 0)
-    vif = saturation.point(lambda v: 255 if v >= SAT_MIN else 0)
+    colore = saturation.point(lambda v: 255 if v >= SAT_COULEUR else 0)
+    vif = saturation.point(lambda v: 255 if v >= SAT_VIF else 0)
     # jaune à rouge d'un côté, magenta de l'autre : les deux bouts de la rampe
     chaud = teinte.point(lambda v: 255 if v < 60 or v > 200 else 0)
-    fonce = valeur.point(lambda v: 255 if v < 200 else 0)
+    fonce = valeur.point(lambda v: 255 if v < VAL_FONCE else 0)
+    eclatant = valeur.point(lambda v: 255 if v >= VAL_ECLATANT else 0)
 
     def et(*masques):
         m = masques[0]
@@ -107,9 +126,10 @@ def _niveaux(mos: Image.Image) -> Image.Image:
         return m
 
     lvl = Image.new("L", mos.size, 0)
-    lvl.paste(1, mask=present)                      # tout écho, halo compris
-    lvl.paste(2, mask=et(present, vif, fonce))      # bleu soutenu
-    lvl.paste(3, mask=et(present, vif, chaud))      # cœur de la cellule
+    lvl.paste(1, mask=et(present, colore))           # pluie faible et au-delà
+    lvl.paste(2, mask=et(present, vif, fonce))       # bleu soutenu
+    lvl.paste(3, mask=et(present, vif, chaud))       # jaune à rouge, magenta vif
+    lvl.paste(3, mask=et(present, eclatant, chaud))  # magenta pâle et blanc
     return lvl
 
 
@@ -156,16 +176,24 @@ def _distance_km(index: int) -> float:
                       (col + 0.5) - GRID_COLS / 2) * GRID_KM
 
 
+def _franches_proches(valeurs: list[float]) -> list[tuple[float, float]]:
+    """(distance, niveau) des cellules de pluie franche dans le rayon, de la
+    plus proche à la plus lointaine."""
+    return sorted((d, v) for i, v in enumerate(valeurs)
+                  if v >= 2 and (d := _distance_km(i)) <= PROCHE_KM)
+
+
 def merite_affichage(valeurs: list[float]) -> bool:
     """La carte a-t-elle quelque chose à raconter ?
 
-    Deux cas seulement : de la pluie assez proche pour arriver dans l'heure, ou
-    une masse organisée même lointaine, dont on veut voir l'approche. Quelques
-    cellules éparses à quarante kilomètres ne sont ni l'un ni l'autre.
+    Seulement de la pluie franche, sur une surface d'averse, assez près pour
+    nous atteindre dans la demi-heure. La pluie faible se lit déjà sur la
+    pastille « pluie en cours », et un front lointain sur la courbe 24 h :
+    c'est précisément ce que les modèles prévoient bien.
     """
-    if any(v >= 1 and _distance_km(i) <= PROCHE_KM for i, v in enumerate(valeurs)):
-        return True
-    return sum(1 for v in valeurs if v >= 2) >= MASSE_MIN
+    # niveau 2 : une cellule ; niveau 3 : deux. Un noyau orageux de 6 km de
+    # large ne couvre que trois cellules, et il mérite la carte.
+    return sum(v - 1 for _, v in _franches_proches(valeurs)) >= SURFACE_MIN
 
 
 def rain_here(grid: PrecipGrid) -> bool:
@@ -182,10 +210,12 @@ def rain_here(grid: PrecipGrid) -> bool:
 
 
 def fetch_radar(cfg: Config) -> PrecipGrid | None:
-    """Champ radar courant, avec la position d'il y a 30 min en contour.
+    """Champ radar courant, avec la position d'il y a 30 min en contour quand
+    la carte mérite d'être affichée. None seulement si le radar est injoignable.
 
-    Rend None quand rien dans la zone ne concerne le domicile (voir
-    merite_affichage) : la carte n'a alors rien à montrer.
+    Afficher la carte et dire s'il pleut ici sont deux décisions distinctes,
+    prises par l'appelant : une pluie faible sur le domicile ne vaut pas la
+    carte, mais vaut la pastille « pluie en cours ».
     """
     try:
         idx = requests.get(INDEX_URL, timeout=TIMEOUT).json()
@@ -197,23 +227,26 @@ def fetch_radar(cfg: Config) -> PrecipGrid | None:
         recente = passees[-1]
         mos, tx0, ty0 = _mosaique(host, recente["path"], cfg)
         valeurs = _echantillonner(_niveaux(mos), tx0, ty0, cfg)
-        if not merite_affichage(valeurs):
-            # rien qui nous concerne : on s'arrête là, sans même télécharger
-            # la mosaïque plus ancienne destinée au contour
-            return None
-
-        # image d'il y a une demi-heure, la plus proche de l'écart voulu
-        contour = None
+        if any(valeurs):
+            # de quoi recalibrer les seuils sur pièces, depuis journalctl
+            proches = _franches_proches(valeurs)
+            log.info("radar : %d cellules de pluie à l'écran, %d franches dont %d "
+                     "fortes à moins de %d km%s, carte %s",
+                     sum(1 for v in valeurs if v), len(proches),
+                     sum(1 for _, v in proches if v >= 3), PROCHE_KM,
+                     f" (la plus proche à {proches[0][0]:.0f} km)" if proches else "",
+                     "affichée" if merite_affichage(valeurs) else "masquée")
+        # image d'il y a une demi-heure, la plus proche de l'écart voulu ; pas
+        # la peine de la télécharger pour une carte qui ne sera pas affichée
+        contour, label = None, ""
         cible = recente["time"] - CONTOUR_MIN * 60
         anciennes = [f for f in passees[:-1] if f["time"] <= cible]
-        if anciennes:
+        if anciennes and merite_affichage(valeurs):
             vieille = max(anciennes, key=lambda f: f["time"])
             mos2, tx2, ty2 = _mosaique(host, vieille["path"], cfg)
             contour = _echantillonner(_niveaux(mos2), tx2, ty2, cfg)
             ecart = round((recente["time"] - vieille["time"]) / 60)
             label = f"contour : il y a {ecart} min"
-        else:
-            label = ""
 
         return PrecipGrid(
             cols=GRID_COLS, rows=GRID_ROWS, km=GRID_KM, values=valeurs,

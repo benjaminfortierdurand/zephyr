@@ -12,7 +12,7 @@ from .netatmo import (NetatmoClient, describe_link, payload_to_current,
 from .normals import get_normals, normals_delta
 from .openmeteo import (fetch_daily, fetch_hourly, payload_to_daily,
                         payload_to_hourly, payload_to_rain_alert, payload_to_sun)
-from .radar import fetch_radar, rain_here
+from .radar import fetch_radar, merite_affichage, rain_here
 
 log = logging.getLogger(__name__)
 
@@ -59,15 +59,15 @@ def collect(cfg: Config) -> Snapshot:
     sunrise, sunset = payload_to_sun(dy_r.payload)
     yesterday_temp = netatmo.fetch_yesterday_temp(cur_r.payload, now)
     rain_soon = payload_to_rain_alert(hr_r.payload, now)
-    # Le radar décide lui-même s'il y a quelque chose à montrer : il rend None
-    # quand aucun écho n'apparaît dans la zone. Plus besoin d'interroger la
-    # prévision pour savoir s'il pleut, ce qui était précisément le maillon
-    # faible : une averse convective ne figure dans aucun modèle.
-    grid = fetch_radar(cfg)
     # Le radar a le dernier mot sur la pluie en cours : il a vu tomber des
-    # averses qu'AROME n'annonçait pas du tout.
+    # averses qu'AROME n'annonçait pas du tout. La pastille se décide avant la
+    # carte, qui a ses propres exigences : une pluie faible sur le domicile
+    # allume l'une sans mériter l'autre.
+    grid = fetch_radar(cfg)
     if grid is not None and rain_here(grid):
         rain_soon = RainAlert(at=now, ongoing=True)
+    if grid is not None and not merite_affichage(grid.values):
+        grid = None
 
     # cache horaire ancien : ne pas afficher des heures déjà passées
     future = [p for p in hourly if p.time >= now - timedelta(minutes=45)]
