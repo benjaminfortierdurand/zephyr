@@ -116,6 +116,13 @@ NETATMO_INDOOR_MODULES=Maison (Indoor)=Salon,Chambre
 (sélectionne et ordonne par nom API, insensible à la casse ; la partie après `=` est le
 nom affiché ; vide = toutes les pièces trouvées, base en premier)
 
+Trois pièces au plus. À trois, elles passent côte à côte et n'affichent plus que leur
+température : l'humidité et le CO2 n'apparaissent que hors des bornes (humidité hors de
+35 à 65 %, CO2 à partir de 1000 ppm). Garder le salon en premier, c'est lui que le
+conseil d'aération compare à l'extérieur. Un nom mal orthographié est signalé au premier
+cycle dans le journal, avec la liste des noms disponibles :
+`module intérieur introuvable : … (disponibles : …)`.
+
 ### 6. Brancher l'écran
 
 **Pi éteint** (`sudo poweroff`, attendre l'extinction de la LED verte, débrancher) :

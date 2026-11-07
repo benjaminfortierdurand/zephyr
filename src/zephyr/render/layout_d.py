@@ -23,6 +23,27 @@ ROOMS_X = 300   # colonne des pièces intérieures
 MARGIN = 22
 MAP_W = 304     # largeur de la carte régionale (cellules carrées sur 164 px de haut)
 
+# À trois pièces, humidité et CO2 ne s'affichent que hors de ces bornes : dans
+# les limites, le chiffre n'appelle aucun geste. Le CO2 reprend le seuil du
+# conseil d'aération.
+HUM_MIN, HUM_MAX = 35, 65
+CO2_MAX = 1000
+
+
+def _hors_normes(room) -> list[str]:
+    lignes = []
+    if room.humidity and not HUM_MIN <= room.humidity <= HUM_MAX:
+        lignes.append(f"{room.humidity} %")
+    if room.co2 is not None and room.co2 >= CO2_MAX:
+        lignes.append(f"{room.co2} ppm")
+    return lignes
+
+
+def _tronquer(d, texte: str, largeur: int, f) -> str:
+    while text_w(d, texte, f) > largeur and len(texte) > 4:
+        texte = texte.rstrip("…")[:-1] + "…"
+    return texte
+
 
 def render(snap: Snapshot) -> Image.Image:
     img, d = new_canvas()
@@ -60,14 +81,28 @@ def render(snap: Snapshot) -> Image.Image:
                       15, 0, lw=1)
     meta_x = WIDTH - MARGIN - text_w(d, date_s, f_date)
 
-    # --- pièces intérieures (2 max) ---------------------------------------
-    avail = meta_x - ROOMS_X - 30
+    # --- pièces intérieures (3 max) ---------------------------------------
+    rooms = snap.indoor[:3]
     f_val, f_lab = font(26, bold=True), font(13)
-    for row, room in enumerate(snap.indoor[:2]):
-        ry = 12 + row * 58
-        d.text((ROOMS_X, ry), fr_num(room.temp) + "°", font=f_val, fill=BLACK)
-        d.text((ROOMS_X, ry + 34), _fit_room_label(d, room, avail, f_lab),
-               font=f_lab, fill=BLACK)
+    if len(rooms) <= 2:
+        avail = meta_x - ROOMS_X - 30
+        for row, room in enumerate(rooms):
+            ry = 12 + row * 58
+            d.text((ROOMS_X, ry), fr_num(room.temp) + "°", font=f_val, fill=BLACK)
+            d.text((ROOMS_X, ry + 34), _fit_room_label(d, room, avail, f_lab),
+                   font=f_lab, fill=BLACK)
+    else:
+        # Trois pièces côte à côte. Leurs neuf chiffres en feraient un tableau :
+        # chacune ne montre que sa température, plus ce qui sort des normes, et
+        # la seule présence d'un chiffre suffit alors à signaler l'écart.
+        col_w = (meta_x - 20 - ROOMS_X) // 3
+        for i, room in enumerate(rooms):
+            x = ROOMS_X + i * col_w
+            d.text((x, 12), fr_num(room.temp) + "°", font=f_val, fill=BLACK)
+            d.text((x, 46), _tronquer(d, room.name.lower(), col_w - 10, f_lab),
+                   font=f_lab, fill=BLACK)
+            for k, ligne in enumerate(_hors_normes(room)):
+                d.text((x, 66 + k * 18), ligne, font=f_lab, fill=BLACK)
 
     d.line((MARGIN, 134, WIDTH - MARGIN, 134), fill=BLACK, width=1)
 
