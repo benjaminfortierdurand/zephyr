@@ -23,18 +23,14 @@ ROOMS_X = 300   # colonne des pièces intérieures
 MARGIN = 22
 MAP_W = 304     # largeur de la carte régionale (cellules carrées sur 164 px de haut)
 
-# À trois pièces, humidité et CO2 ne s'affichent que hors de ces bornes : dans
-# les limites, le chiffre n'appelle aucun geste. Le CO2 reprend le seuil du
-# conseil d'aération.
-HUM_MIN, HUM_MAX = 35, 65
-CO2_MAX = 1000
 
-
-def _hors_normes(room) -> list[str]:
+def _mesures(room) -> list[str]:
+    """Humidité puis CO2, chacun sur sa ligne : « 51 % · 1080 ppm » sur une
+    seule ne tient pas dans un tiers de la zone."""
     lignes = []
-    if room.humidity and not HUM_MIN <= room.humidity <= HUM_MAX:
+    if room.humidity:            # 0 : humidité absente de la réponse
         lignes.append(f"{room.humidity} %")
-    if room.co2 is not None and room.co2 >= CO2_MAX:
+    if room.co2 is not None:
         lignes.append(f"{room.co2} ppm")
     return lignes
 
@@ -92,16 +88,15 @@ def render(snap: Snapshot) -> Image.Image:
             d.text((ROOMS_X, ry + 34), _fit_room_label(d, room, avail, f_lab),
                    font=f_lab, fill=BLACK)
     else:
-        # Trois pièces côte à côte. Leurs neuf chiffres en feraient un tableau :
-        # chacune ne montre que sa température, plus ce qui sort des normes, et
-        # la seule présence d'un chiffre suffit alors à signaler l'écart.
+        # Trois pièces côte à côte : sur trois lignes, nom et mesures ne
+        # tiendraient plus à droite de la température.
         col_w = (meta_x - 20 - ROOMS_X) // 3
         for i, room in enumerate(rooms):
             x = ROOMS_X + i * col_w
             d.text((x, 12), fr_num(room.temp) + "°", font=f_val, fill=BLACK)
             d.text((x, 46), _tronquer(d, room.name.lower(), col_w - 10, f_lab),
                    font=f_lab, fill=BLACK)
-            for k, ligne in enumerate(_hors_normes(room)):
+            for k, ligne in enumerate(_mesures(room)):
                 d.text((x, 66 + k * 18), ligne, font=f_lab, fill=BLACK)
 
     d.line((MARGIN, 134, WIDTH - MARGIN, 134), fill=BLACK, width=1)
